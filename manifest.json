@@ -1,0 +1,19 @@
+{
+  "name": "Road Trip Planner",
+  "short_name": "Trip Planner",
+  "description": "Plan multi-stop road trips with map, bookings and offline support.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#2e353b",
+  "background_color": "#2e353b",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

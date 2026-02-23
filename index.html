@@ -1,0 +1,3809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Road Trip Planner</title>
+  <!-- PWA -->
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#2e353b" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Trip Planner" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <style>
+    /*
+      Palette  coolors.co/03b5aa-424c55-f7fff6-a29f15-ee4266  — DARK MODE
+        #2e353b  Deep Charcoal (darkened #424C55) – header bg
+        #424C55  Charcoal    – primary sidebar / panel background
+        #4e5b65  Mid Charcoal (lightened #424C55) – cards, inputs
+        #F7FFF6  Mint Cream  – primary text
+        #03B5AA  Teal        – primary accent (CTA, active, focus, route)
+        #A29F15  Old Gold    – secondary accent (day labels, stats)
+        #EE4266  Watermelon  – danger (errors, delete hover)
+    */
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* ── Header ─────────────────────────────────────────────── */
+    header {
+      background: #2e353b;
+      color: #F7FFF6;
+      padding: 11px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(0,0,0,.4);
+    }
+    header h1 { font-size: 1.15rem; font-weight: 700; }
+    header .spacer { flex: 1; }
+    .btn-map-toggle {
+      width: 32px; height: 32px;
+      border: 1.5px solid rgba(247,255,246,.25);
+      background: none;
+      border-radius: 7px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(247,255,246,.6);
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+      flex-shrink: 0;
+    }
+    .btn-map-toggle:hover  { background: rgba(247,255,246,.1); color: #F7FFF6; border-color: rgba(247,255,246,.45); }
+    .btn-map-toggle.active { background: rgba(3,181,170,.18);  color: #03B5AA; border-color: #03B5AA; }
+    .marker-opts-wrap { position: relative; }
+    .marker-opts-panel {
+      display: none; position: absolute; top: calc(100% + 6px); right: 0;
+      background: #2a3340; border: 1px solid rgba(247,255,246,.18);
+      border-radius: 10px; padding: 10px 10px 12px;
+      min-width: 188px; z-index: 1200;
+      box-shadow: 0 6px 24px rgba(0,0,0,.55);
+    }
+    .marker-opts-panel.open { display: block; }
+    .marker-opts-title {
+      font-size: .6rem; font-weight: 800; color: rgba(247,255,246,.3);
+      text-transform: uppercase; letter-spacing: .07em; padding-bottom: 8px;
+    }
+    .marker-opts-grid { display: flex; flex-wrap: wrap; gap: 5px; }
+    .marker-opt-btn {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 9px; border-radius: 20px; font-size: .72rem;
+      font-weight: 600; font-family: inherit; cursor: pointer; border: 1.5px solid;
+      transition: opacity .12s, filter .12s;
+    }
+    .marker-opt-btn.on  { background: rgba(247,255,246,.1); border-color: rgba(247,255,246,.4); color: #F7FFF6; }
+    .marker-opt-btn.off { background: rgba(247,255,246,.04); border-color: rgba(247,255,246,.1);
+                          color: rgba(247,255,246,.3); filter: grayscale(1); }
+    .marker-opt-btn:hover { opacity: .8; }
+
+    /* ── App layout ──────────────────────────────────────────── */
+    .app { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .sidebar {
+      width: 390px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      background: #424C55;
+      border-right: 1px solid rgba(247,255,246,.1);
+      overflow: hidden;
+      transition: width .28s ease;
+    }
+    .sidebar.collapsed { width: 0; border-right: none; }
+
+    /* ── Sidebar collapse handle ──────────────────────────────── */
+    .sidebar-handle {
+      width: 14px;
+      flex-shrink: 0;
+      background: #363e46;
+      border-right: 1px solid rgba(247,255,246,.07);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 100;
+      transition: background .15s, width .15s;
+      position: relative;
+    }
+    .sidebar-handle:hover { background: #454f5a; width: 18px; }
+    .sidebar-handle svg {
+      color: rgba(247,255,246,.35);
+      transition: color .15s, transform .28s ease;
+      flex-shrink: 0;
+    }
+    .sidebar-handle:hover svg { color: rgba(247,255,246,.75); }
+    .sidebar.collapsed + .sidebar-handle svg { transform: rotate(180deg); }
+
+    /* ── Tabs ────────────────────────────────────────────────── */
+    .tabs { display: flex; border-bottom: 1px solid rgba(247,255,246,.1); flex-shrink: 0; }
+    .tab-btn {
+      flex: 1;
+      padding: 10px 6px;
+      border: none;
+      background: none;
+      font-size: .82rem;
+      font-weight: 600;
+      color: rgba(247,255,246,.45);
+      cursor: pointer;
+      border-bottom: 2.5px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    .tab-btn.active { color: #03B5AA; border-bottom-color: #03B5AA; }
+
+    /* ── Add-stop form ───────────────────────────────────────── */
+    .form-panel {
+      flex: 1;
+      overflow-y: auto;
+      padding: 15px 16px 20px;
+      background: #424C55;
+    }
+    .form-panel.hidden { display: none; }
+
+    .form-row { display: flex; gap: 10px; margin-bottom: 11px; }
+    .form-group { margin-bottom: 11px; }
+    .form-row .form-group { flex: 1; margin-bottom: 0; }
+
+    label {
+      display: block;
+      font-size: .73rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      color: rgba(247,255,246,.55);
+      margin-bottom: 4px;
+    }
+    input[type="text"],
+    input[type="number"],
+    input[type="url"],
+    input[type="time"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1.5px solid rgba(247,255,246,.15);
+      border-radius: 7px;
+      font-size: .88rem;
+      font-family: inherit;
+      color: #F7FFF6;
+      background: #4e5b65;
+      transition: border-color .2s;
+    }
+    select option { background: #4e5b65; color: #F7FFF6; }
+    input::placeholder, textarea::placeholder { color: rgba(247,255,246,.35); }
+    input:focus, textarea:focus, select:focus {
+      outline: none;
+      border-color: #03B5AA;
+      box-shadow: 0 0 0 3px rgba(3,181,170,.2);
+    }
+    textarea { resize: vertical; min-height: 62px; }
+    input[type="number"] { -moz-appearance: textfield; }
+    input[type="number"]::-webkit-inner-spin-button { opacity: 1; }
+    input[type="time"]::-webkit-calendar-picker-indicator { filter: invert(1) opacity(.4); cursor: pointer; }
+
+    .field-hint {
+      font-size: .71rem;
+      color: rgba(247,255,246,.5);
+      margin-top: 3px;
+      line-height: 1.45;
+    }
+
+    .status-msg {
+      display: none;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 10px;
+      border-radius: 6px;
+      font-size: .8rem;
+      margin-bottom: 10px;
+    }
+    .status-msg.show { display: flex; }
+    .status-msg.loading { background: rgba(3,181,170,.15);    color: #03B5AA; }
+    .status-msg.error   { background: rgba(238,66,102,.15);   color: #EE4266; }
+    .status-msg.ok      { background: rgba(3,181,170,.15);    color: #03B5AA; }
+
+    .spinner {
+      display: inline-block;
+      width: 13px; height: 13px;
+      border: 2px solid rgba(3,181,170,.25);
+      border-top-color: #03B5AA;
+      border-radius: 50%;
+      animation: spin .65s linear infinite;
+      flex-shrink: 0;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .btn-add {
+      width: 100%;
+      padding: 10px;
+      background: #03B5AA;
+      color: #F7FFF6;
+      border: none;
+      border-radius: 7px;
+      font-size: .9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .2s;
+      margin-top: 2px;
+    }
+    .btn-add:hover:not(:disabled) { background: #02a09a; }
+    .btn-add:disabled { background: rgba(247,255,246,.1); color: rgba(247,255,246,.3); cursor: not-allowed; }
+
+    .btn-cancel-edit {
+      display: none;
+      width: 100%;
+      padding: 7px;
+      margin-top: 6px;
+      background: none;
+      border: 1.5px solid rgba(247,255,246,.2);
+      border-radius: 7px;
+      font-size: .82rem;
+      font-weight: 600;
+      color: rgba(247,255,246,.55);
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+    }
+    .btn-cancel-edit:hover { border-color: #EE4266; color: #EE4266; }
+
+    .btn-icon.edit:hover { background: rgba(3,181,170,.15); color: #03B5AA; }
+    .btn-icon.move:hover { background: rgba(162,159,21,.15); color: #A29F15; }
+
+    /* ── Itinerary list panel ─────────────────────────────────── */
+    .list-panel {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .list-panel.active { display: flex; }
+
+    #stop-list-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 10px 10px;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 50px 24px;
+      color: rgba(247,255,246,.35);
+      text-align: center;
+    }
+    .empty-state svg { width: 46px; height: 46px; margin-bottom: 12px; opacity: .35; }
+    .empty-state p { font-size: .87rem; line-height: 1.65; }
+
+    /* ── Day section ─────────────────────────────────────────── */
+    .day-section { margin-bottom: 4px; }
+
+    .day-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 2px 6px;
+      position: sticky;
+      top: 0;
+      background: #424C55;
+      z-index: 5;
+    }
+    .day-label {
+      font-size: .76rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .07em;
+      color: #A29F15;
+      white-space: nowrap;
+    }
+    .day-divider { flex: 1; height: 1px; background: rgba(247,255,246,.1); }
+    .day-count { font-size: .7rem; color: rgba(247,255,246,.4); white-space: nowrap; }
+    .day-group-stops { min-height: 8px; }
+
+    /* ── Stop card ───────────────────────────────────────────── */
+    .stop-item {
+      background: #4e5b65;
+      border: 1.5px solid rgba(247,255,246,.12);
+      border-radius: 10px;
+      padding: 10px 11px;
+      margin-bottom: 7px;
+      cursor: grab;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .stop-item:hover { box-shadow: 0 2px 12px rgba(0,0,0,.3); border-color: #03B5AA; }
+    .stop-item.sortable-ghost   { opacity: .3; }
+    .stop-item.sortable-chosen  { cursor: grabbing; box-shadow: 0 5px 18px rgba(0,0,0,.4); }
+
+    .stop-top { display: flex; align-items: flex-start; gap: 9px; }
+    .stop-badge {
+      width: 34px; height: 34px;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 16px;
+      flex-shrink: 0;
+    }
+    .stop-body { flex: 1; min-width: 0; }
+    .stop-name {
+      font-weight: 700;
+      font-size: .9rem;
+      color: #F7FFF6;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .stop-meta {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      margin-top: 3px;
+      flex-wrap: wrap;
+    }
+    .type-pill {
+      font-size: .67rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 20px;
+    }
+    .time-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 3px;
+      font-size: .69rem;
+      font-weight: 600;
+      color: rgba(247,255,246,.45);
+      white-space: nowrap;
+    }
+
+    /* ── Itinerary view toggle ─────────────────────────────────── */
+    .view-toggle-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 7px 12px 6px;
+      border-bottom: 1px solid rgba(247,255,246,.08);
+      flex-shrink: 0;
+    }
+    .view-toggle-bar > span {
+      flex: 1;
+      font-size: .72rem;
+      font-weight: 700;
+      color: rgba(247,255,246,.3);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+    .btn-view-toggle {
+      width: 28px; height: 28px;
+      border: 1.5px solid rgba(247,255,246,.12);
+      background: none;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(247,255,246,.35);
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .btn-view-toggle:hover {
+      background: rgba(247,255,246,.07);
+      color: #F7FFF6;
+      border-color: rgba(247,255,246,.3);
+    }
+    .btn-view-toggle.active {
+      background: rgba(3,181,170,.12);
+      color: #03B5AA;
+      border-color: rgba(3,181,170,.4);
+    }
+
+    /* ── Timeline ─────────────────────────────────────────────── */
+    .tl-grid    { display: flex; flex-shrink: 0; }
+    .tl-axis    { width: 44px; flex-shrink: 0; position: relative; }
+    .tl-hour-label {
+      position: absolute; right: 8px;
+      font-size: .65rem; font-weight: 600;
+      color: rgba(247,255,246,.3);
+      transform: translateY(-50%);
+      white-space: nowrap;
+    }
+    .tl-lanes   { flex: 1; position: relative; }
+    .tl-hour-line {
+      position: absolute; left: 0; right: 0;
+      height: 1px;
+      background: rgba(247,255,246,.07);
+    }
+    .tl-block {
+      position: absolute; left: 2px; right: 2px;
+      border-radius: 7px;
+      padding: 5px 8px;
+      border: 1.5px solid rgba(247,255,246,.1);
+      border-left-width: 3px;
+      overflow: hidden;
+      cursor: pointer;
+      box-sizing: border-box;
+      transition: box-shadow .15s, border-color .15s;
+    }
+    .tl-block:hover {
+      box-shadow: 0 2px 10px rgba(0,0,0,.3);
+      border-right-color:  rgba(247,255,246,.25);
+      border-top-color:    rgba(247,255,246,.25);
+      border-bottom-color: rgba(247,255,246,.25);
+    }
+    .tl-block-name {
+      font-size: .78rem; font-weight: 700; color: #F7FFF6;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .tl-block-time { font-size: .67rem; color: rgba(247,255,246,.5); margin-top: 1px; }
+    .tl-block-booking { margin-top: 3px; overflow: hidden; }
+    .tl-block-edit {
+      position: absolute; top: 4px; right: 4px;
+      width: 20px; height: 20px; padding: 0; border: none;
+      display: none; align-items: center; justify-content: center;
+      border-radius: 4px; background: rgba(247,255,246,.08);
+      cursor: pointer; opacity: .75; }
+    .tl-block:hover .tl-block-edit          { display: flex; }
+    .tl-block-edit:hover                    { background: rgba(247,255,246,.18); opacity: 1; }
+    .tl-block--dragging .tl-block-edit      { display: none !important; }
+    .tl-block       { cursor: grab; touch-action: none; user-select: none; }
+    .tl-block--dragging { z-index: 10; opacity: .88; cursor: grabbing !important;
+      box-shadow: 0 6px 20px rgba(0,0,0,.5) !important; transition: none !important; }
+
+    .tl-drive-block {
+      position: absolute; left: 6px; right: 6px;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(3,181,170,.06);
+      border: 1.5px dashed rgba(3,181,170,.25);
+      box-sizing: border-box; pointer-events: none; overflow: hidden;
+    }
+    .tl-drive-block--warn    { background: rgba(238,66,102,.07); border-color: rgba(238,66,102,.3); }
+    .tl-drive-block--loading { background: rgba(247,255,246,.02); border-color: rgba(247,255,246,.08); }
+    .tl-drive-label { font-size: .62rem; font-weight: 700; color: rgba(3,181,170,.75); white-space: nowrap; }
+    .tl-drive-block--warn    .tl-drive-label { color: rgba(238,66,102,.7); }
+    .tl-drive-block--loading .tl-drive-label { color: rgba(247,255,246,.2); }
+    .tl-gap-axis  { position: absolute; left: 0; right: 0;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(247,255,246,.2); font-size: .68rem; }
+    .tl-gap-strip { position: absolute; left: 6px; right: 6px;
+      border-top: 1px dashed rgba(247,255,246,.1);
+      border-bottom: 1px dashed rgba(247,255,246,.1);
+      border-radius: 2px; box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center;
+      pointer-events: none; overflow: hidden; }
+    .tl-gap-label { font-size: .58rem; color: rgba(247,255,246,.2); white-space: nowrap; }
+
+    .tl-no-time        { padding: 4px 0 12px; }
+    .tl-no-time-label  {
+      font-size: .67rem; font-weight: 700; color: rgba(247,255,246,.25);
+      text-transform: uppercase; letter-spacing: .06em;
+      padding: 8px 0 6px;
+    }
+    .tl-mini-card {
+      position: relative;
+      border: 1.5px solid rgba(247,255,246,.08);
+      border-left-width: 3px;
+      border-radius: 7px;
+      padding: 6px 10px;
+      margin-bottom: 5px;
+      cursor: pointer;
+      background: rgba(247,255,246,.03);
+      transition: border-color .15s;
+    }
+    .tl-mini-card:hover {
+      border-right-color:  rgba(247,255,246,.2);
+      border-top-color:    rgba(247,255,246,.2);
+      border-bottom-color: rgba(247,255,246,.2);
+    }
+    .tl-mini-card:hover .tl-block-edit { display: flex; }
+    .tl-mini-card-name { font-size: .8rem; font-weight: 700; color: #F7FFF6; }
+    .tl-mini-card-meta { font-size: .67rem; color: rgba(247,255,246,.4); margin-top: 2px; }
+
+    .stop-notes-preview {
+      font-size: .79rem;
+      color: rgba(247,255,246,.55);
+      margin-top: 6px;
+      line-height: 1.4;
+    }
+    .stop-photo-thumb {
+      width: 100%;
+      max-height: 100px;
+      object-fit: cover;
+      border-radius: 6px;
+      margin-top: 8px;
+      display: block;
+    }
+    .stop-actions { display: flex; gap: 2px; flex-shrink: 0; }
+    .btn-icon {
+      width: 28px; height: 28px;
+      border: none; background: none;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(247,255,246,.4);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+    }
+    .btn-icon:hover     { background: rgba(247,255,246,.08); color: #F7FFF6; }
+    .btn-icon.del:hover { background: rgba(238,66,102,.15);  color: #EE4266; }
+
+    /* ── Trip stats ──────────────────────────────────────────── */
+    .trip-stats {
+      padding: 9px 14px;
+      background: rgba(162,159,21,.1);
+      border-top: 1px solid rgba(162,159,21,.35);
+      font-size: .78rem;
+      color: #A29F15;
+      display: none;
+      flex-shrink: 0;
+    }
+
+    /* ── Trip bar ────────────────────────────────────────────────── */
+    .trip-bar {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 10px;
+      background: #2e353b;
+      border-bottom: 1px solid rgba(247,255,246,.1);
+      flex-shrink: 0;
+    }
+    .trip-select {
+      flex: 1;
+      min-width: 0;
+      padding: 5px 8px;
+      background: #424C55;
+      color: #F7FFF6;
+      border: 1.5px solid rgba(247,255,246,.15);
+      border-radius: 6px;
+      font-size: .83rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      appearance: auto;
+    }
+    .trip-select:focus { outline: none; border-color: #03B5AA; }
+    .trip-select option { background: #424C55; color: #F7FFF6; }
+    .btn-trip {
+      width: 28px; height: 28px;
+      border: none; background: none;
+      border-radius: 5px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(247,255,246,.45);
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      flex-shrink: 0;
+    }
+    .btn-trip:hover      { background: rgba(247,255,246,.08); color: #F7FFF6; }
+    .btn-trip.new:hover  { background: rgba(3,181,170,.15);   color: #03B5AA; }
+    .btn-trip.del:hover  { background: rgba(238,66,102,.15);  color: #EE4266; }
+    .btn-trip:disabled   { opacity: .3; cursor: not-allowed;  pointer-events: none; }
+
+    /* ── Trip date bar ───────────────────────────────────────── */
+    .trip-date-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 10px 6px;
+      background: #2e353b;
+      border-bottom: 1px solid rgba(247,255,246,.1);
+      flex-shrink: 0;
+    }
+    .trip-date-label {
+      display: flex; align-items: center; gap: 5px;
+      font-size: .72rem; font-weight: 600;
+      color: rgba(247,255,246,.45);
+      white-space: nowrap;
+    }
+    .trip-date-input {
+      flex: 1; min-width: 0;
+      padding: 3px 7px;
+      background: #424C55;
+      color: #F7FFF6;
+      border: 1.5px solid rgba(247,255,246,.15);
+      border-radius: 6px;
+      font-size: .78rem; font-family: inherit;
+      cursor: pointer;
+      color-scheme: dark;
+    }
+    .trip-date-input:focus { outline: none; border-color: #03B5AA; }
+    .trip-date-clear {
+      background: none; border: none;
+      color: rgba(247,255,246,.3); font-size: .8rem;
+      cursor: pointer; padding: 2px 4px; border-radius: 4px;
+      line-height: 1; flex-shrink: 0;
+      transition: color .15s;
+    }
+    .trip-date-clear:hover { color: rgba(247,255,246,.75); }
+
+    /* ── Day header date label ───────────────────────────────── */
+    .day-date {
+      font-size: .72rem; font-weight: 600;
+      color: rgba(247,255,246,.38);
+      white-space: nowrap;
+    }
+
+    /* ── Filter bar ──────────────────────────────────────────── */
+    .filter-bar {
+      background: #272d32;
+      border-bottom: 1px solid rgba(247,255,246,.1);
+      flex-shrink: 0;
+    }
+    .filter-bar-header {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 5px 10px 5px 12px;
+    }
+    .filter-bar-label {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: .7rem;
+      font-weight: 700;
+      color: rgba(247,255,246,.35);
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      flex: 1;
+    }
+    .filter-bar-actions { display: flex; gap: 3px; align-items: center; }
+    .btn-filter-ctrl {
+      padding: 2px 8px;
+      font-size: .7rem;
+      font-weight: 700;
+      font-family: inherit;
+      background: none;
+      border: 1px solid rgba(247,255,246,.18);
+      border-radius: 4px;
+      color: rgba(247,255,246,.45);
+      cursor: pointer;
+      transition: background .15s, color .15s, border-color .15s;
+      letter-spacing: .03em;
+    }
+    .btn-filter-ctrl:hover { background: rgba(247,255,246,.08); color: #F7FFF6; border-color: rgba(247,255,246,.4); }
+    .btn-filter-chevron {
+      width: 22px; height: 22px;
+      background: none; border: none;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      color: rgba(247,255,246,.35);
+      cursor: pointer;
+      transition: background .15s, color .15s, transform .2s;
+    }
+    .btn-filter-chevron:hover { background: rgba(247,255,246,.08); color: #F7FFF6; }
+    .btn-filter-chevron.open  { transform: rotate(180deg); }
+    .filter-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+      padding: 0 10px 8px;
+      max-height: 120px;
+      overflow: hidden;
+      transition: max-height .22s ease, padding-bottom .22s ease, opacity .22s;
+      opacity: 1;
+    }
+    .filter-chips.collapsed {
+      max-height: 0;
+      padding-bottom: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #day-filter-section { max-height: 300px; border-top: 1px solid rgba(247,255,246,.08); padding-top: 6px; }
+    .day-filter-hdr {
+      width: 100%; display: flex; align-items: center; gap: 5px; padding-bottom: 5px; }
+    .filter-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 9px 3px 6px;
+      border-radius: 20px;
+      font-size: .73rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1.5px solid transparent;
+      background: none;
+      transition: opacity .15s, filter .15s, transform .1s;
+      user-select: none;
+      white-space: nowrap;
+    }
+    .filter-chip:hover { transform: translateY(-1px); }
+    .filter-chip.off {
+      background: rgba(247,255,246,.05) !important;
+      border-color: rgba(247,255,246,.1) !important;
+      color: rgba(247,255,246,.28) !important;
+      filter: grayscale(1);
+    }
+
+    /* ── Leg connector (between stop cards) ──────────────────── */
+    .leg-connector {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0 10px 0 38px;
+      position: relative;
+      min-height: 26px;
+    }
+    .leg-connector::before {
+      content: '';
+      position: absolute;
+      left: 22px;
+      top: 0; bottom: 0;
+      width: 2px;
+      background: rgba(247,255,246,.1);
+    }
+    .leg-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 9px 2px 7px;
+      border-radius: 20px;
+      font-size: .7rem;
+      font-weight: 700;
+      font-family: inherit;
+      cursor: pointer;
+      border: 1.5px solid;
+      background: none;
+      transition: background .15s, color .15s, border-color .15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .leg-toggle.included {
+      border-color: rgba(3,181,170,.35);
+      color: rgba(3,181,170,.8);
+    }
+    .leg-toggle.included:hover {
+      background: rgba(238,66,102,.08);
+      border-color: rgba(238,66,102,.4);
+      color: #EE4266;
+    }
+    .leg-toggle.excluded {
+      border-color: rgba(238,66,102,.3);
+      color: rgba(238,66,102,.6);
+    }
+    .leg-toggle.excluded:hover {
+      background: rgba(3,181,170,.1);
+      border-color: rgba(3,181,170,.4);
+      color: #03B5AA;
+    }
+    .leg-data-badge {
+      font-size: .68rem;
+      color: rgba(247,255,246,.35);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* ── Map ─────────────────────────────────────────────────── */
+    #map { flex: 1; z-index: 0; }
+
+    /* ── Marker label tooltip ────────────────────────────────── */
+    .leaflet-tooltip.map-label {
+      background: rgba(255,255,255,.94);
+      border: 1px solid rgba(0,0,0,.12);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #111;
+      box-shadow: 0 1px 5px rgba(0,0,0,.14);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    .leaflet-tooltip.map-label::before { display: none !important; }
+
+    /* ── Driving distance label (floating map chip) ──────────── */
+    .leaflet-tooltip.drive-dist-label {
+      background: #1e2328;
+      border: 1.5px solid rgba(3,181,170,.5);
+      border-radius: 20px;
+      padding: 3px 10px;
+      font-size: 10.5px;
+      font-weight: 700;
+      color: #03B5AA;
+      box-shadow: 0 2px 8px rgba(0,0,0,.35);
+      white-space: nowrap;
+      pointer-events: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .leaflet-tooltip.drive-dist-label::before { display: none !important; }
+
+    /* ── Bookings panel ──────────────────────────────────────── */
+    .bookings-section-title {
+      font-size: .6rem; font-weight: 800; text-transform: uppercase;
+      letter-spacing: .07em; color: rgba(247,255,246,.35);
+      padding-bottom: 8px; padding-top: 4px;
+    }
+    .inroute-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 11px; padding: 8px 11px;
+      background: rgba(3,181,170,.08);
+      border-radius: 7px; border: 1px solid rgba(3,181,170,.22);
+    }
+    .inroute-row label {
+      font-size: .78rem; font-weight: 600; color: rgba(247,255,246,.8);
+      text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; flex: 1;
+    }
+    .inroute-row input[type="checkbox"] {
+      width: 16px; height: 16px; cursor: pointer;
+      accent-color: #03B5AA; flex-shrink: 0;
+    }
+
+    /* ── Span item list cards ─────────────────────────────────── */
+    .span-item {
+      background: #4e5b65; border-radius: 9px;
+      padding: 9px 11px; margin-bottom: 7px;
+      display: flex; flex-direction: column; gap: 5px;
+    }
+    .span-item-top {
+      display: flex; align-items: center; gap: 8px;
+    }
+    .span-item-dot {
+      width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+    }
+    .span-item-name {
+      font-size: .85rem; font-weight: 600; color: #F7FFF6;
+      flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .span-item-meta {
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+      font-size: .7rem; color: rgba(247,255,246,.45);
+    }
+    .span-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
+    .span-inroute-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: .65rem; font-weight: 700;
+      background: rgba(3,181,170,.18); color: #03B5AA;
+      border-radius: 20px; padding: 1px 7px;
+    }
+
+    /* ── Span chips (timeline + list view) ───────────────────── */
+    .tl-span-row {
+      display: flex; flex-wrap: wrap; gap: 5px;
+      padding: 4px 10px 8px;
+    }
+    .span-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 3px 10px; border-radius: 20px;
+      font-size: .68rem; font-weight: 700;
+      white-space: nowrap; border: 1.5px solid transparent;
+      cursor: pointer; transition: opacity .12s;
+    }
+    .span-chip:hover { opacity: .8; }
+
+    /* ── Booking card highlight (when jumped to from a stop badge) */
+    @keyframes bk-flash {
+      0%   { background: rgba(247,255,246,.13); box-shadow: 0 0 0 2px rgba(247,255,246,.18); }
+      100% { background: transparent;           box-shadow: none; }
+    }
+    .span-item--highlight { animation: bk-flash .5s ease-out 2; }
+
+    /* ── Booking reference badge on stop cards ────────────────── */
+    .booking-ref-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      font-size: .65rem; font-weight: 700;
+      border-radius: 20px; padding: 1px 7px;
+      cursor: pointer; white-space: nowrap;
+    }
+    .booking-ref-badge:hover { opacity: .78; }
+
+    /* ── Markdown rendered content ───────────────────────────── */
+    .md-content { line-height: 1.5; }
+    .md-content p            { margin: 0 0 4px; }
+    .md-content p:last-child { margin-bottom: 0; }
+    .md-content ul, .md-content ol { margin: 3px 0 3px 16px; }
+    .md-content li           { margin-bottom: 2px; }
+    .md-content a            { color: #03B5AA; text-decoration: underline; }
+    .md-content a:hover      { opacity: .8; }
+    .md-content strong       { color: #F7FFF6; font-weight: 700; }
+    .md-content em           { opacity: .85; }
+    .md-content code         { background: rgba(247,255,246,.1); padding: 1px 5px;
+                               border-radius: 3px; font-size: .85em; }
+    .md-content pre          { background: rgba(247,255,246,.07); padding: 7px 10px;
+                               border-radius: 5px; overflow-x: auto; margin: 4px 0; }
+    .md-content pre code     { background: none; padding: 0; }
+    .md-content h1, .md-content h2, .md-content h3 {
+      font-size: .82rem; font-weight: 700; color: #F7FFF6; margin: 6px 0 2px; }
+    .md-content blockquote   { border-left: 3px solid #03B5AA; margin: 4px 0;
+                               padding-left: 8px; color: rgba(247,255,246,.55); }
+    .md-content hr           { border: none; border-top: 1px solid rgba(247,255,246,.15);
+                               margin: 6px 0; }
+
+    /* ── Trip description bar ────────────────────────────────── */
+    .trip-desc-bar    { background: #2e353b; border-bottom: 1px solid rgba(247,255,246,.1);
+                        flex-shrink: 0; }
+    .trip-desc-header { display: flex; align-items: center; gap: 6px; padding: 5px 10px;
+                        cursor: pointer; user-select: none; }
+    .trip-desc-header:hover .trip-desc-label { color: rgba(247,255,246,.65); }
+    .trip-desc-icon   { font-size: .6rem; color: rgba(247,255,246,.3); transition: transform .15s; }
+    .trip-desc-icon.open { transform: rotate(90deg); }
+    .trip-desc-label  { font-size: .72rem; font-weight: 600; color: rgba(247,255,246,.4); }
+    .trip-desc-body   { padding: 4px 12px 10px; }
+    .trip-desc-view   { font-size: .78rem; color: rgba(247,255,246,.6); cursor: text;
+                        min-height: 14px; }
+    .trip-desc-view:empty::after { content: 'Click to add trip notes…';
+                                   color: rgba(247,255,246,.2); font-style: italic; }
+    .trip-desc-edit   { width: 100%; min-height: 80px; resize: vertical;
+                        background: rgba(247,255,246,.05); color: #F7FFF6;
+                        border: 1.5px solid rgba(247,255,246,.15); border-radius: 6px;
+                        padding: 6px 8px; font-size: .78rem; font-family: inherit;
+                        line-height: 1.5; }
+    .trip-desc-edit:focus { outline: none; border-color: #03B5AA; }
+
+    /* ── GitHub sync button states ───────────────────────────── */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .btn-sync-spinning svg { animation: spin .9s linear infinite; }
+    .btn-trip.sync-synced  { color: #03B5AA; }
+    .btn-trip.sync-error   { color: #EE4266; }
+    .btn-trip.sync-offline { opacity: .35; }
+    .sync-time-badge { font-size: .58rem; color: rgba(247,255,246,.35);
+                       display: block; text-align: center; line-height: 1;
+                       margin-top: 1px; white-space: nowrap; }
+
+    /* ── Offline indicator pill ──────────────────────────────── */
+    .offline-pill { background: #EE4266; color: #fff; font-size: .62rem; font-weight: 700;
+                    padding: 2px 7px; border-radius: 20px; white-space: nowrap; }
+
+    /* ── Toast notification ──────────────────────────────────── */
+    .toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(8px);
+             background: #2e353b; color: #F7FFF6; border: 1px solid rgba(247,255,246,.15);
+             border-radius: 8px; padding: 9px 16px; font-size: .8rem; font-weight: 600;
+             box-shadow: 0 4px 20px rgba(0,0,0,.4); z-index: 9999;
+             pointer-events: none; opacity: 0; transition: opacity .2s, transform .2s; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    @keyframes toast-in { from { opacity:0; transform: translateX(-50%) translateY(8px); }
+                          to   { opacity:1; transform: translateX(-50%) translateY(0); } }
+
+    /* ── GitHub settings modal ───────────────────────────────── */
+    .gh-modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.65);
+                   display: flex; align-items: center; justify-content: center;
+                   z-index: 9000; padding: 16px; }
+    .gh-modal-bg.hidden { display: none; }
+    .gh-modal    { background: #424C55; border-radius: 12px; padding: 22px 20px 20px;
+                   width: min(420px, 100%); max-height: 90vh; overflow-y: auto;
+                   box-shadow: 0 8px 40px rgba(0,0,0,.55); }
+    .gh-form-group { margin-bottom: 12px; }
+    .gh-label    { display: block; font-size: .75rem; font-weight: 700;
+                   color: rgba(247,255,246,.7); margin-bottom: 4px; }
+    .gh-input    { width: 100%; background: rgba(247,255,246,.07); color: #F7FFF6;
+                   border: 1.5px solid rgba(247,255,246,.15); border-radius: 7px;
+                   padding: 7px 10px; font-size: .82rem; font-family: inherit;
+                   box-sizing: border-box; }
+    .gh-input:focus { outline: none; border-color: #03B5AA; }
+    .gh-hint     { font-size: .68rem; color: rgba(247,255,246,.35); margin-top: 3px; line-height: 1.4; }
+    .gh-hint code { background: rgba(247,255,246,.1); padding: 1px 4px; border-radius: 3px; }
+    .gh-modal-actions { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .gh-modal-actions button { flex: 1; min-width: 80px; padding: 8px 10px;
+                                border: none; border-radius: 7px; font-size: .8rem;
+                                font-weight: 700; font-family: inherit; cursor: pointer;
+                                transition: opacity .15s; }
+    .gh-modal-actions button:hover { opacity: .85; }
+    .btn-gh-save  { background: #03B5AA; color: #fff; }
+    .btn-gh-test  { background: rgba(247,255,246,.1); color: #F7FFF6; }
+    .btn-gh-close { background: none; border: none; color: rgba(247,255,246,.45);
+                    font-size: 1rem; cursor: pointer; padding: 2px 6px; line-height: 1; }
+    .btn-gh-close:hover { color: #F7FFF6; }
+    .gh-test-result { font-size: .75rem; margin-top: 8px; padding: 6px 10px;
+                      border-radius: 6px; line-height: 1.4; }
+    .gh-test-result.hidden  { display: none; }
+    .gh-test-result.success { background: rgba(3,181,170,.15); color: #03B5AA; display: block; }
+    .gh-test-result.error   { background: rgba(238,66,102,.15); color: #EE4266; display: block; }
+    .gh-setup-guide { margin-top: 14px; }
+    .gh-setup-guide summary { font-size: .75rem; font-weight: 700; color: rgba(247,255,246,.45);
+                               cursor: pointer; user-select: none; }
+    .gh-setup-guide summary:hover { color: rgba(247,255,246,.7); }
+    .gh-setup-steps p    { font-size: .74rem; color: rgba(247,255,246,.5); line-height: 1.5;
+                           margin: 8px 0 4px; }
+    .gh-setup-steps strong { color: rgba(247,255,246,.75); }
+    .gh-setup-steps em   { color: rgba(247,255,246,.6); font-style: italic; }
+    .gh-setup-steps code { background: rgba(247,255,246,.1); padding: 1px 5px;
+                            border-radius: 3px; font-size: .82em; }
+    .gh-toggle-row  { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+    .gh-toggle-row label { font-size: .75rem; color: rgba(247,255,246,.6);
+                           font-weight: 600; cursor: pointer; }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 680px) {
+      body { overflow: auto; }
+      .app { flex-direction: column; overflow: visible; }
+      .sidebar { width: 100% !important; height: auto; max-height: 58vh; transition: none; }
+      .sidebar.collapsed { width: 100% !important; height: 0; max-height: 0; }
+      .sidebar-handle { display: none; }
+      #map { height: 45vh; flex: none; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2"
+       stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="10" r="3"/>
+    <path d="M12 2a8 8 0 0 0-8 8c0 5.5 7.4 12.6 7.7 12.9a.45.45 0 0 0 .6 0C12.6 22.6 20 15.5 20 10a8 8 0 0 0-8-8z"/>
+  </svg>
+  <h1>Road Trip Planner</h1>
+  <span class="spacer"></span>
+  <div class="marker-opts-wrap">
+    <button class="btn-map-toggle" id="btn-map-toggle" title="Marker display options"
+            onclick="toggleMarkerOptsPanel(event)">
+      <!-- layers icon -->
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
+        <polyline points="2 17 12 22 22 17"/>
+        <polyline points="2 12 12 17 22 12"/>
+      </svg>
+    </button>
+    <div class="marker-opts-panel" id="marker-opts-panel" onclick="event.stopPropagation()">
+      <div class="marker-opts-title">Marker content</div>
+      <div class="marker-opts-grid" id="marker-opts-grid"></div>
+    </div>
+  </div>
+  <button class="btn-map-toggle" id="btn-drive-toggle" title="Show driving route &amp; distances" onclick="toggleDrivingMode()">
+    <!-- car / route icon -->
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 17H3a2 2 0 0 1-2-2V9l2.5-5h13L19 9v6a2 2 0 0 1-2 2h-2"/>
+      <circle cx="7.5" cy="17.5" r="2.5"/>
+      <circle cx="16.5" cy="17.5" r="2.5"/>
+      <line x1="10" y1="17.5" x2="14" y2="17.5"/>
+    </svg>
+  </button>
+</header>
+
+<div class="app">
+
+  <!-- ── Sidebar ─────────────────────────────────────────────── -->
+  <div class="sidebar">
+
+    <!-- Trip bar -->
+    <div class="trip-bar">
+      <select class="trip-select" id="trip-select" onchange="switchTrip(+this.value)"></select>
+      <span id="offline-pill" class="offline-pill hidden">Offline</span>
+      <button class="btn-trip" id="btn-trip-rename" title="Rename trip" onclick="renameTrip()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+      </button>
+      <button class="btn-trip new" title="New trip" onclick="createTrip()">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+        </svg>
+      </button>
+      <button class="btn-trip del" id="btn-trip-del" title="Delete trip" onclick="deleteCurrentTrip()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </button>
+      <!-- GitHub sync button (state updated by renderSyncBtn) -->
+      <button class="btn-trip" id="btn-sync" title="Sync with GitHub" onclick="syncData()"
+              style="flex-direction:column;gap:0;height:34px">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 20a6 6 0 0 0 0-12h-1A7 7 0 1 0 5 16"/>
+          <polyline points="12 16 12 12 10 14"/><polyline points="12 12 14 14"/>
+        </svg>
+      </button>
+      <!-- GitHub settings gear -->
+      <button class="btn-trip" id="btn-gh-settings" title="GitHub sync settings" onclick="openSettings()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Trip date bar -->
+    <div class="trip-date-bar">
+      <label class="trip-date-label" for="inp-trip-start">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+          <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+          <line x1="3" y1="10" x2="21" y2="10"/>
+        </svg>
+        Start date
+      </label>
+      <input type="date" id="inp-trip-start" class="trip-date-input"
+             onchange="setTripStartDate(this.value)" />
+      <button class="trip-date-clear" id="btn-trip-date-clear"
+              onclick="setTripStartDate('')" title="Clear date" style="display:none">✕</button>
+    </div>
+
+    <!-- Trip description bar -->
+    <div class="trip-desc-bar" id="trip-desc-bar">
+      <div class="trip-desc-header" onclick="toggleTripDesc()">
+        <span class="trip-desc-icon" id="trip-desc-icon">▸</span>
+        <span class="trip-desc-label" id="trip-desc-label">Trip notes</span>
+      </div>
+      <div class="trip-desc-body hidden" id="trip-desc-body">
+        <div class="trip-desc-view md-content" id="trip-desc-view" onclick="editTripDesc()"></div>
+        <textarea class="trip-desc-edit hidden" id="trip-desc-edit"
+                  placeholder="Add trip overview, tips, links… (supports **bold**, *italic*, - lists, [links](url))"
+                  onblur="saveTripDesc()"></textarea>
+      </div>
+    </div>
+
+    <!-- Filter bar -->
+    <div class="filter-bar" id="filter-bar">
+      <div class="filter-bar-header">
+        <span class="filter-bar-label">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+            <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+          </svg>
+          Map Filter
+        </span>
+        <div class="filter-bar-actions">
+          <button class="btn-filter-ctrl" onclick="setAllTypesVisible(true)"  title="Show all types">All</button>
+          <button class="btn-filter-ctrl" onclick="setAllTypesVisible(false)" title="Hide all types">None</button>
+          <button class="btn-filter-chevron open" id="btn-filter-chevron" onclick="toggleFilterBar()" title="Collapse filter">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="filter-chips" id="filter-chips">
+        <!-- populated by renderFilterBar() -->
+      </div>
+      <div class="filter-chips" id="day-filter-section" style="display:none">
+        <!-- populated by renderDayFilter() -->
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-add"      onclick="showTab('add')">＋ Add Stop</button>
+      <button class="tab-btn"        id="tab-list"     onclick="showTab('list')">Itinerary</button>
+      <button class="tab-btn"        id="tab-bookings" onclick="showTab('bookings')">📋 Bookings</button>
+    </div>
+
+    <!-- Add Stop Form -->
+    <div class="form-panel" id="panel-add">
+
+      <div class="form-row">
+        <div class="form-group" style="flex:0 0 90px">
+          <label for="inp-day">Day #</label>
+          <input type="number" id="inp-day" min="1" value="1" />
+        </div>
+        <div class="form-group">
+          <label for="inp-type">Stop Type</label>
+          <select id="inp-type"></select>
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label for="inp-start">Start Time</label>
+          <input type="time" id="inp-start" onchange="calcTimeFields('start')" />
+        </div>
+        <div class="form-group" style="flex:0 0 82px">
+          <label for="inp-dur">Duration</label>
+          <input type="text" id="inp-dur" placeholder="h:mm" maxlength="5"
+                 autocomplete="off" onchange="calcTimeFields('dur')" />
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="inp-end">End Time</label>
+          <input type="time" id="inp-end" onchange="calcTimeFields('end')" />
+        </div>
+      </div>
+
+      <div class="form-group" id="booking-ref-row" style="display:none">
+        <label for="inp-booking-ref">Link to Booking</label>
+        <select id="inp-booking-ref" onchange="onBookingRefChange()">
+          <option value="">— None —</option>
+        </select>
+        <div class="field-hint">Pick a booking to use its saved location — Maps URL becomes optional.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="inp-maps">Google Maps Link <span id="maps-url-required">*</span></label>
+        <input type="url" id="inp-maps" placeholder="Paste a Google Maps URL…" autocomplete="off" />
+        <div class="field-hint">
+          In Google Maps: tap <em>Share → Copy link</em>, or copy the URL from your browser's address bar.
+          Also accepts <em>lat, lng</em> coordinates directly.
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="inp-name">Location Name *</label>
+        <input type="text" id="inp-name" placeholder="e.g. Grand Canyon South Rim" autocomplete="off" />
+        <div class="field-hint">Shown as a label on the map marker.</div>
+      </div>
+
+      <div class="form-group">
+        <label for="inp-notes">Notes</label>
+        <textarea id="inp-notes" placeholder="What are you planning here?"></textarea>
+        <div class="field-hint">Supports **bold**, *italic*, - lists, [links](url)</div>
+      </div>
+
+      <div class="form-group">
+        <label for="inp-photo">Photo URL</label>
+        <input type="url" id="inp-photo" placeholder="https://… (shown in map popup &amp; list)" autocomplete="off" />
+      </div>
+
+      <div class="status-msg" id="status-msg">
+        <span id="status-icon" class="spinner"></span>
+        <span id="status-text"></span>
+      </div>
+
+      <button class="btn-add" id="btn-add" onclick="addStop()">+ Add Stop</button>
+      <button class="btn-cancel-edit" id="btn-cancel-edit" onclick="cancelEdit()">× Cancel edit</button>
+    </div>
+
+    <!-- Itinerary List -->
+    <div class="list-panel" id="panel-list">
+      <div class="view-toggle-bar">
+        <span>View</span>
+        <button class="btn-view-toggle active" id="btn-view-list"
+                onclick="setItineraryView('list')" title="Card list">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="8" y1="6"  x2="21" y2="6"/>
+            <line x1="8" y1="12" x2="21" y2="12"/>
+            <line x1="8" y1="18" x2="21" y2="18"/>
+            <circle cx="3" cy="6"  r="1" fill="currentColor" stroke="none"/>
+            <circle cx="3" cy="12" r="1" fill="currentColor" stroke="none"/>
+            <circle cx="3" cy="18" r="1" fill="currentColor" stroke="none"/>
+          </svg>
+        </button>
+        <button class="btn-view-toggle" id="btn-view-timeline"
+                onclick="setItineraryView('timeline')" title="Timeline">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="9" y1="3" x2="9" y2="21"/>
+            <circle cx="9" cy="7"  r="2.5" fill="currentColor" stroke="none"/>
+            <line x1="12" y1="7"  x2="19" y2="7"/>
+            <circle cx="9" cy="13" r="2.5" fill="currentColor" stroke="none"/>
+            <line x1="12" y1="13" x2="21" y2="13"/>
+            <circle cx="9" cy="19" r="2.5" fill="currentColor" stroke="none"/>
+            <line x1="12" y1="19" x2="16" y2="19"/>
+          </svg>
+        </button>
+      </div>
+      <div id="stop-list-container"></div>
+      <div class="trip-stats" id="trip-stats">
+        <strong>Total route:</strong> <span id="total-distance">—</span>
+      </div>
+    </div>
+
+    <!-- ── Bookings Panel ───────────────────────────────────── -->
+    <div class="form-panel hidden" id="panel-bookings">
+      <div class="bookings-section-title">Add Multi-Day Item</div>
+
+      <div class="form-group">
+        <label for="bk-name">Name *</label>
+        <input type="text" id="bk-name" placeholder="e.g. Hotel Splendid, Hertz Rental"
+               autocomplete="off" />
+      </div>
+
+      <div class="form-group">
+        <label for="bk-type">Type</label>
+        <select id="bk-type">
+          <option value="accommodation">🏨 Accommodation</option>
+          <option value="rental">🚗 Car / Rental</option>
+          <option value="transport">✈️ Transport</option>
+          <option value="other_span">📌 Other</option>
+        </select>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label for="bk-start-day">From Day</label>
+          <input type="number" id="bk-start-day" min="1" value="1" />
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="bk-end-day">To Day</label>
+          <input type="number" id="bk-end-day" min="1" value="1" />
+        </div>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group" style="flex:1">
+          <label for="bk-checkin">Check-in</label>
+          <input type="time" id="bk-checkin" />
+        </div>
+        <div class="form-group" style="flex:1">
+          <label for="bk-checkout">Check-out</label>
+          <input type="time" id="bk-checkout" />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="bk-maps">Location (Google Maps URL)</label>
+        <input type="url" id="bk-maps"
+               placeholder="Paste a Google Maps URL or lat,lng" autocomplete="off" />
+        <div class="field-hint">Optional — enables map pin and route inclusion.</div>
+      </div>
+
+      <div class="inroute-row">
+        <input type="checkbox" id="bk-inroute" />
+        <label for="bk-inroute">Include in driving route (requires location)</label>
+      </div>
+
+      <div class="form-group">
+        <label for="bk-notes">Notes</label>
+        <textarea id="bk-notes" placeholder="Booking ref, address, contact…"></textarea>
+        <div class="field-hint">Supports **bold**, *italic*, - lists, [links](url)</div>
+      </div>
+
+      <div class="status-msg" id="bk-status-msg">
+        <span id="bk-status-icon" class="spinner"></span>
+        <span id="bk-status-text"></span>
+      </div>
+
+      <button class="btn-add" id="btn-booking-add" onclick="addBooking()">+ Add Booking</button>
+      <button class="btn-cancel-edit" id="btn-booking-cancel"
+              onclick="cancelBookingEdit()" style="display:none">× Cancel edit</button>
+
+      <div style="margin-top:18px">
+        <div class="bookings-section-title">Saved Bookings</div>
+        <div id="bookings-list"></div>
+      </div>
+    </div>
+
+  </div><!-- /sidebar -->
+
+  <!-- Sidebar collapse handle -->
+  <div class="sidebar-handle" id="sidebar-handle" onclick="toggleSidebar()" title="Collapse sidebar">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="15 18 9 12 15 6"/>
+    </svg>
+  </div>
+
+  <div id="map"></div>
+
+</div><!-- /app -->
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/marked@11/marked.min.js"></script>
+<script>
+
+// ─── Stop type definitions ──────────────────────────────────────────
+const TYPES = {
+  accommodation: {
+    label: 'Accommodation', color: '#03B5AA',
+    svgPath: 'M216,72H32V48a8,8,0,0,0-16,0V208a8,8,0,0,0,16,0V176H240v32a8,8,0,0,0,16,0V112A40,40,0,0,0,216,72ZM32,88h72v72H32Zm88,72V88h96a24,24,0,0,1,24,24v48Z',
+  },
+  food: {
+    label: 'Restaurant/Food', color: '#EE4266',
+    svgPath: 'M72,88V40a8,8,0,0,1,16,0V88a8,8,0,0,1-16,0ZM216,40V224a8,8,0,0,1-16,0V176H152a8,8,0,0,1-8-8,268.75,268.75,0,0,1,7.22-56.88c9.78-40.49,28.32-67.63,53.63-78.47A8,8,0,0,1,216,40ZM200,53.9c-32.17,24.57-38.47,84.42-39.7,106.1H200ZM119.89,38.69a8,8,0,1,0-15.78,2.63L112,88.63a32,32,0,0,1-64,0l7.88-47.31a8,8,0,1,0-15.78-2.63l-8,48A8.17,8.17,0,0,0,32,88a48.07,48.07,0,0,0,40,47.32V224a8,8,0,0,0,16,0V135.32A48.07,48.07,0,0,0,128,88a8.17,8.17,0,0,0-.11-1.31Z',
+  },
+  photo: {
+    label: 'Photo Stop', color: '#3dccc5',
+    svgPath: 'M208,56H180.28L166.65,35.56A8,8,0,0,0,160,32H96a8,8,0,0,0-6.65,3.56L75.71,56H48A24,24,0,0,0,24,80V192a24,24,0,0,0,24,24H208a24,24,0,0,0,24-24V80A24,24,0,0,0,208,56Zm8,136a8,8,0,0,1-8,8H48a8,8,0,0,1-8-8V80a8,8,0,0,1,8-8H80a8,8,0,0,0,6.66-3.56L100.28,48h55.43l13.63,20.44A8,8,0,0,0,176,72h32a8,8,0,0,1,8,8ZM128,88a44,44,0,1,0,44,44A44.05,44.05,0,0,0,128,88Zm0,72a28,28,0,1,1,28-28A28,28,0,0,1,128,160Z',
+  },
+  nature: {
+    label: 'Nature / Hike', color: '#A29F15',
+    svgPath: 'M198.1,62.59a76,76,0,0,0-140.2,0A71.71,71.71,0,0,0,16,127.8C15.9,166,48,199,86.14,200A72.09,72.09,0,0,0,120,192.47V232a8,8,0,0,0,16,0V192.47A72.17,72.17,0,0,0,168,200l1.82,0C208,199,240.11,166,240,127.8A71.71,71.71,0,0,0,198.1,62.59ZM169.45,184a56.08,56.08,0,0,1-33.45-10v-41l43.58-21.78a8,8,0,1,0-7.16-14.32L136,115.06V88a8,8,0,0,0-16,0v51.06L83.58,120.84a8,8,0,1,0-7.16,14.32L120,156.94v17a56,56,0,0,1-33.45,10C56.9,183.23,31.92,157.52,32,127.84A55.77,55.77,0,0,1,67.11,76a8,8,0,0,0,4.53-4.67,60,60,0,0,1,112.72,0A8,8,0,0,0,188.89,76,55.79,55.79,0,0,1,224,127.84C224.08,157.52,199.1,183.23,169.45,184Z',
+  },
+  beach: {
+    label: 'Beach', color: '#027d76',
+    svgPath: 'M240,126.63A112.44,112.44,0,0,0,51.75,53.75a111.56,111.56,0,0,0-35.7,72.88A16,16,0,0,0,32,144h88v56a32,32,0,0,0,64,0,8,8,0,0,0-16,0,16,16,0,0,1-32,0V144h88a16,16,0,0,0,16-17.37ZM32,128l0,0a96.15,96.15,0,0,1,76.2-85.89C96.48,58,81.85,86.11,80.17,128Zm64.15,0c1.39-30.77,10.53-52.81,18.3-66.24A106.44,106.44,0,0,1,128,43.16a106.31,106.31,0,0,1,13.52,18.6C154.8,84.7,159,109.28,159.82,128Zm79.65,0c-1.68-41.89-16.31-70-28-85.94A96.07,96.07,0,0,1,224,128Z',
+  },
+  shopping: {
+    label: 'Shopping', color: '#f26b88',
+    svgPath: 'M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,88a48,48,0,0,1-96,0,8,8,0,0,1,16,0,32,32,0,0,0,64,0,8,8,0,0,1,16,0Z',
+  },
+  other: {
+    label: 'Other', color: '#c4c11c',
+    svgPath: 'M128,64a40,40,0,1,0,40,40A40,40,0,0,0,128,64Zm0,64a24,24,0,1,1,24-24A24,24,0,0,1,128,128Zm0-112a88.1,88.1,0,0,0-88,88c0,31.4,14.51,64.68,42,96.25a254.19,254.19,0,0,0,41.45,38.3,8,8,0,0,0,9.18,0A254.19,254.19,0,0,0,174,200.25c27.45-31.57,42-64.85,42-96.25A88.1,88.1,0,0,0,128,16Zm0,206c-16.53-13-72-60.75-72-118a72,72,0,0,1,144,0C200,161.23,144.53,209,128,222Z',
+  },
+};
+
+// ─── Multi-day span item types ────────────────────────────────────────
+const SPAN_TYPES = {
+  accommodation: { label: 'Accommodation', color: '#8B5CF6' },
+  rental:        { label: 'Car / Rental',  color: '#F59E0B' },
+  transport:     { label: 'Transport',     color: '#3B82F6' },
+  other_span:    { label: 'Other',         color: '#94A3B8' },
+};
+
+// Returns a white-filled or color-filled Phosphor SVG icon string.
+// pass fill:'white' for markers, omit for badges (uses t.color).
+function iconHtml(typeKey, { size = 18, fill } = {}) {
+  const t = TYPES[typeKey] || TYPES.other;
+  const f = fill || t.color;
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}"
+               fill="${f}" viewBox="0 0 256 256" style="display:block;flex-shrink:0">
+            <path d="${t.svgPath}"/>
+          </svg>`;
+}
+
+// Populate type <select>
+const typeSelect = document.getElementById('inp-type');
+Object.entries(TYPES).forEach(([key, t]) => {
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = t.label;
+  typeSelect.appendChild(opt);
+});
+
+// ─── State ──────────────────────────────────────────────────────────
+let trips      = [];
+let activeId   = null;
+let stops      = [];
+let markerMap  = {};        // id → Leaflet marker
+let routeLines = [];        // L.polyline instances for route segments (replaces single routeLine)
+let editingId  = null;      // id of stop being edited, or null in add-mode
+let markerOptions  = { photo: true, day: true, type: true, time: true, name: true };
+let markerOptsOpen = false;                         // marker-options popover open
+let sidebarCollapsed  = false;                      // sidebar collapsed state
+let spanItems         = [];                         // multi-day items per trip
+let editingSpanId     = null;                       // id of span item being edited
+let startDate         = '';                         // ISO start date of active trip (YYYY-MM-DD)
+let description       = '';                         // active trip markdown description
+let savedAt           = 0;                          // timestamp of last save (for sync conflict resolution)
+let githubSettings    = { pat:'', owner:'', repo:'', path:'trips.json', autoSync:false };
+let lastSyncTime      = null;                       // Date of last successful GitHub sync
+let visibleTypes    = new Set(Object.keys(TYPES));  // types currently shown on map
+let activeDayFilter = new Set();                    // selected days; empty = all shown
+let filterBarOpen = true;                           // filter chip panel open/closed
+let timelineView      = false;                       // itinerary timeline vs card list
+let tlFetchInProgress = false;                       // guard: prevent concurrent fetchTimelineDriving()
+let drivingMode   = false;                          // driving route mode (OSRM)
+let distanceMarkers = [];                           // L.tooltip instances for per-leg labels
+let fetchController = null;                         // AbortController for in-flight OSRM request
+let mapVersion    = 0;                              // incremented on each updateMap() call
+let excludedLegs  = new Set();                      // "fromId_toId" strings for excluded legs
+let cachedDriveLegs = new Map();                    // legKey → {distance, duration} from OSRM
+
+// ─── Leg exclusion helpers ────────────────────────────────────────────
+function legKey(fromId, toId)        { return `${fromId}_${toId}`; }
+function isLegExcluded(fromId, toId) { return excludedLegs.has(legKey(fromId, toId)); }
+
+function toggleLeg(fromId, toId) {
+  const k = legKey(fromId, toId);
+  if (excludedLegs.has(k)) excludedLegs.delete(k); else excludedLegs.add(k);
+  cachedDriveLegs = new Map(); // invalidate driving cache — route has changed
+  save();
+  renderAll();
+}
+
+// Split an ordered stop array into contiguous groups with no excluded leg between consecutive stops
+function buildSegments(orderedStops) {
+  if (!orderedStops.length) return [];
+  const segs = [];
+  let cur = [orderedStops[0]];
+  for (let i = 1; i < orderedStops.length; i++) {
+    if (isLegExcluded(orderedStops[i-1].id, orderedStops[i].id)) {
+      segs.push([...cur]);
+      cur = [orderedStops[i]];
+    } else {
+      cur.push(orderedStops[i]);
+    }
+  }
+  segs.push([...cur]);
+  return segs;
+}
+
+// ─── Driving route helpers ────────────────────────────────────────────
+function formatDist(meters) {
+  return `${(meters / 1000).toFixed(1)} km`;
+}
+
+function formatTime(seconds) {
+  const mins = Math.round(seconds / 60);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60), m = mins % 60;
+  return m === 0 ? `${h}h` : `${h}h ${m}m`;
+}
+
+function clearDistanceMarkers() {
+  distanceMarkers.forEach(t => { try { map.removeLayer(t); } catch(_) {} });
+  distanceMarkers = [];
+}
+
+async function fetchDrivingRoute(stopsArr, signal) {
+  // Uses the OSRM demo server (OpenStreetMap routing — no API key required)
+  const coordStr = stopsArr.map(s => `${s.lng},${s.lat}`).join(';');
+  try {
+    const res  = await fetch(
+      `https://router.project-osrm.org/route/v1/driving/${coordStr}` +
+      `?overview=full&geometries=geojson`,
+      { signal }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    return (data.code === 'Ok' && data.routes?.length) ? data.routes[0] : null;
+  } catch (e) {
+    if (e?.name === 'AbortError') return null;
+    console.warn('OSRM fetch failed:', e);
+    return null;
+  }
+}
+
+// ─── Load / migrate data ─────────────────────────────────────────────
+function loadData() {
+  const raw = localStorage.getItem('roadtrip-v3');
+  if (raw) {
+    const data = JSON.parse(raw);
+    trips    = data.trips    || [];
+    activeId = data.activeId || null;
+    savedAt  = data.savedAt  || 0;
+  } else {
+    // Migrate from v2 (or start fresh)
+    const v2stops = JSON.parse(localStorage.getItem('roadtrip-v2') || '[]');
+    const first   = { id: Date.now(), name: 'My Road Trip', stops: v2stops };
+    trips    = [first];
+    activeId = first.id;
+    savedAt  = 0;
+    localStorage.removeItem('roadtrip-v2');
+  }
+  // Guard: ensure activeId points to a real trip
+  if (!trips.find(t => t.id === activeId) && trips.length) activeId = trips[0].id;
+  const _activeTrip = trips.find(t => t.id === activeId);
+  stops        = _activeTrip?.stops       ?? [];
+  spanItems    = _activeTrip?.spanItems   ?? [];
+  startDate    = _activeTrip?.startDate   ?? '';
+  description  = _activeTrip?.description ?? '';
+  excludedLegs = new Set((_activeTrip?.excludedLegs || []).map(([a, b]) => legKey(a, b)));
+}
+loadData();
+// Load GitHub sync settings (separate localStorage key)
+(function() {
+  const raw = localStorage.getItem('roadtrip-gh');
+  if (raw) try { githubSettings = { ...githubSettings, ...JSON.parse(raw) }; } catch {}
+})();
+
+// ─── Map setup ──────────────────────────────────────────────────────
+const map = L.map('map').setView([39.5, -98.35], 4);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '© <a href="https://www.openstreetmap.org/copyright" target="_blank">OpenStreetMap</a> contributors',
+  maxZoom: 19,
+}).addTo(map);
+
+// ─── Marker icon: card with day number + type icon + optional photo ──
+function pinIcon(type, day, photoUrl, startTime, endTime) {
+  const t       = TYPES[type] || TYPES.other;
+  const TRI_H   = 9;
+  const TIME_H  = 16;
+  const W       = 72;
+  const PHOTO_H = 48;
+  const BAR_H   = 28;
+  const DARK    = '#1a2228';
+
+  const showPhoto = markerOptions.photo && !!photoUrl;
+  const showTime  = markerOptions.time  && !!startTime;
+  const showDay   = markerOptions.day;
+  const showType  = markerOptions.type;
+
+  const totalH = (showPhoto ? PHOTO_H : 0) + BAR_H + (showTime ? TIME_H : 0) + TRI_H;
+
+  const photoSection = showPhoto ? `
+    <div style="width:${W}px;height:${PHOTO_H}px;overflow:hidden;
+                border-radius:8px 8px 0 0;flex-shrink:0;
+                border:2.5px solid white;border-bottom:none;">
+      <img src="${esc(photoUrl)}"
+           style="width:100%;height:100%;object-fit:cover;display:block"
+           onerror="this.parentElement.style.display='none'" />
+    </div>` : '';
+
+  const barRadius  = `${showPhoto ? '0' : '8px'} ${showPhoto ? '0' : '8px'} ${showTime ? '0' : '8px'} ${showTime ? '0' : '8px'}`;
+  const barJustify = (showDay && showType) ? 'space-between' : 'center';
+
+  const timeSection = showTime ? `
+    <div style="
+      width:${W}px; height:${TIME_H}px;
+      background:${DARK};
+      border-radius:0 0 8px 8px;
+      border:2.5px solid white; border-top:none;
+      display:flex; align-items:center; justify-content:center;
+      gap:3px; box-sizing:border-box;
+    ">
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#03B5AA"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      <span style="color:#03B5AA;font-size:8.5px;font-weight:800;
+                   font-family:-apple-system,sans-serif;
+                   white-space:nowrap;letter-spacing:.02em">
+        ${startTime}${endTime ? ` – ${endTime}` : ''}
+      </span>
+    </div>` : '';
+
+  return L.divIcon({
+    className: '',
+    html: `
+      <div style="display:inline-flex;flex-direction:column;align-items:center;
+                  filter:drop-shadow(0 3px 7px rgba(0,0,0,.38))">
+        ${photoSection}
+        <div style="
+          width:${W}px; height:${BAR_H}px;
+          background:${t.color};
+          border-radius:${barRadius};
+          border:2.5px solid white;${showPhoto ? 'border-top:none;' : ''}${showTime ? 'border-bottom:none;' : ''}
+          display:flex; align-items:center; justify-content:${barJustify};
+          padding:0 8px; gap:4px; box-sizing:border-box;
+        ">
+          ${showDay ? `<span style="color:white;font-size:10.5px;font-weight:800;
+                       font-family:-apple-system,sans-serif;
+                       white-space:nowrap;line-height:1;letter-spacing:.01em">
+            ${String(day || 0).padStart(2, '0')}
+          </span>` : ''}
+          ${showType ? iconHtml(type, { size: 15, fill: 'white' }) : ''}
+        </div>
+        ${timeSection}
+        <div style="
+          width:0; height:0;
+          border-left:8px solid transparent;
+          border-right:8px solid transparent;
+          border-top:${TRI_H}px solid ${showTime ? DARK : t.color};
+          margin-top:-1.5px;
+        "></div>
+      </div>`,
+    iconSize:    [W, totalH],
+    iconAnchor:  [W / 2, totalH],
+    popupAnchor: [0, -(totalH + 6)],
+  });
+}
+
+// ─── Persist ─────────────────────────────────────────────────────────
+function save() {
+  const t = trips.find(t => t.id === activeId);
+  if (t) {
+    t.stops        = stops;
+    t.spanItems    = spanItems;
+    t.startDate    = startDate;
+    t.description  = description;
+    t.excludedLegs = [...excludedLegs].map(k => k.split('_').map(Number));
+  }
+  savedAt = Date.now();
+  localStorage.setItem('roadtrip-v3', JSON.stringify({ activeId, trips, savedAt }));
+}
+
+// ─── Parse Google Maps URL ───────────────────────────────────────────
+function parseMapUrl(raw) {
+  if (!raw) return null;
+  const url = raw.trim();
+
+  // @lat,lng  (standard browser address bar URL)
+  let m = url.match(/@(-?\d+\.?\d+),(-?\d+\.?\d+)/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  // !3dlat!4dlng  (data= URLs)
+  m = url.match(/!3d(-?\d+\.?\d+)[^!]*!4d(-?\d+\.?\d+)/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  // ?q=lat,lng  or  ?query=lat,lng
+  m = url.match(/[?&](?:q|query)=(-?\d+\.?\d+),(-?\d+\.?\d+)/);
+  if (m) return { lat: +m[1], lng: +m[2] };
+
+  // Plain "lat, lng" typed directly
+  m = url.match(/^(-?\d+\.?\d+)\s*,\s*(-?\d+\.?\d+)$/);
+  if (m && Math.abs(+m[1]) <= 90 && Math.abs(+m[2]) <= 180)
+    return { lat: +m[1], lng: +m[2] };
+
+  return null;
+}
+
+// ─── Extract place name from a Google Maps URL ───────────────────────
+function extractNameFromMapUrl(raw) {
+  if (!raw) return null;
+  const url = raw.trim();
+
+  // /maps/place/Place+Name/@...  (most common browser URL)
+  let m = url.match(/\/maps\/place\/([^/@?]+)/);
+  if (m) return decodeURIComponent(m[1].replace(/\+/g, ' '));
+
+  // /maps/search/Place+Name
+  m = url.match(/\/maps\/search\/([^/?]+)/);
+  if (m) return decodeURIComponent(m[1].replace(/\+/g, ' '));
+
+  // ?q=Place+Name  (only if not plain coordinates)
+  m = url.match(/[?&]q=([^&]+)/);
+  if (m) {
+    const val = decodeURIComponent(m[1].replace(/\+/g, ' ')).trim();
+    if (!/^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(val)) return val;
+  }
+
+  return null;
+}
+
+// Auto-fill location name from Maps URL when the name field is still empty
+document.getElementById('inp-maps').addEventListener('input', () => {
+  const nameEl = document.getElementById('inp-name');
+  if (nameEl.value.trim()) return;           // don't overwrite user's own text
+  const extracted = extractNameFromMapUrl(document.getElementById('inp-maps').value);
+  if (extracted) nameEl.value = extracted;
+});
+
+// ─── Geocode via Nominatim (fallback) ────────────────────────────────
+async function geocode(name) {
+  const res = await fetch(
+    `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(name)}`,
+    { headers: { 'Accept-Language': 'en' } }
+  );
+  const data = await res.json();
+  if (!data.length) return null;
+  return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+}
+
+// ─── Status message ──────────────────────────────────────────────────
+function setStatus(kind, msg) {
+  const el   = document.getElementById('status-msg');
+  const icon = document.getElementById('status-icon');
+  const txt  = document.getElementById('status-text');
+  el.className = `status-msg show ${kind}`;
+  icon.className = kind === 'loading' ? 'spinner' : '';
+  icon.textContent = kind === 'error' ? '⚠' : kind === 'ok' ? '✓' : '';
+  txt.textContent = msg;
+}
+function clearStatus() { document.getElementById('status-msg').className = 'status-msg'; }
+
+// ─── Booking-ref select helpers ──────────────────────────────────────
+function renderBookingRefSelect() {
+  const sel = document.getElementById('inp-booking-ref');
+  if (!sel) return;
+  const cur = sel.value;
+
+  // Rebuild options — only bookings that have a geocoded location
+  sel.innerHTML = '<option value="">— None —</option>';
+  const withLoc = spanItems.filter(si => si.lat);
+  [...withLoc].sort((a, b) => (a.startDay || 0) - (b.startDay || 0)).forEach(si => {
+    const opt = document.createElement('option');
+    opt.value = si.id;
+    const dayStr   = si.startDay === si.endDay ? `Day ${si.startDay}` : `Days ${si.startDay}–${si.endDay}`;
+    const dateStr  = formatDayDate(si.startDay);
+    opt.textContent = `${si.name} (${dayStr}${dateStr ? ' · ' + dateStr : ''})`;
+    sel.appendChild(opt);
+  });
+
+  // Restore prior selection if it still exists in the list
+  if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
+
+  // Show row only when there are bookings with a location
+  document.getElementById('booking-ref-row').style.display = withLoc.length ? '' : 'none';
+
+  // Toggle the * required marker on the Maps URL label
+  const req = document.getElementById('maps-url-required');
+  if (req) req.style.display = sel.value ? 'none' : '';
+}
+
+function onBookingRefChange() {
+  const sel = document.getElementById('inp-booking-ref');
+  const id  = parseInt(sel.value) || null;
+  const si  = id ? spanItems.find(s => s.id === id) : null;
+
+  // Toggle * required marker
+  const req = document.getElementById('maps-url-required');
+  if (req) req.style.display = id ? 'none' : '';
+
+  if (!si) return;
+
+  // Pre-fill name if empty
+  const nameEl = document.getElementById('inp-name');
+  if (!nameEl.value.trim()) nameEl.value = si.name;
+
+  // Pre-fill Maps URL if booking has one
+  if (si.mapsUrl) document.getElementById('inp-maps').value = si.mapsUrl;
+}
+
+// ─── Add stop ────────────────────────────────────────────────────────
+async function addStop() {
+  const day        = Math.max(1, parseInt(document.getElementById('inp-day').value) || 1);
+  const type       = document.getElementById('inp-type').value;
+  const name       = document.getElementById('inp-name').value.trim();
+  const mapsUrl    = document.getElementById('inp-maps').value.trim();
+  const notes      = document.getElementById('inp-notes').value.trim();
+  const photoUrl   = document.getElementById('inp-photo').value.trim();
+  const startTime  = document.getElementById('inp-start').value;
+  const endTime    = document.getElementById('inp-end').value;
+  const btn        = document.getElementById('btn-add');
+
+  // Booking link — if set the stop inherits the booking's coordinates
+  const bookingRef = parseInt(document.getElementById('inp-booking-ref').value) || null;
+  const linkedBk   = bookingRef ? spanItems.find(si => si.id === bookingRef) : null;
+
+  // Maps URL is required only when no linked booking provides coordinates
+  if (!linkedBk?.lat && !mapsUrl) { document.getElementById('inp-maps').focus(); return; }
+  if (!name)                       { document.getElementById('inp-name').focus(); return; }
+
+  btn.disabled = true;
+  setStatus('loading', 'Locating stop…');
+
+  try {
+    // Use linked booking's location directly, otherwise parse / geocode from Maps URL
+    let coords = (linkedBk && linkedBk.lat)
+      ? { lat: linkedBk.lat, lng: linkedBk.lng }
+      : parseMapUrl(mapsUrl);
+
+    // In edit mode: if the Maps URL hasn't changed, reuse the stored coordinates
+    if (!coords && editingId !== null) {
+      const orig = stops.find(s => s.id === editingId);
+      if (orig && orig.mapsUrl === mapsUrl) coords = { lat: orig.lat, lng: orig.lng };
+    }
+
+    if (!coords) {
+      // Shortened link warning
+      if (/goo\.gl|maps\.app/i.test(mapsUrl)) {
+        setStatus('error', 'Short link detected. Open it in your browser and copy the full URL from the address bar.');
+        btn.disabled = false;
+        return;
+      }
+      // Geocode by name as fallback
+      setStatus('loading', 'URL not parsed — geocoding by name…');
+      coords = await geocode(name);
+    }
+
+    if (!coords) {
+      setStatus('error', 'Could not find location. Check the Maps URL or try a more specific name.');
+      btn.disabled = false;
+      return;
+    }
+
+    if (editingId !== null) {
+      // Update existing stop in-place
+      const idx = stops.findIndex(s => s.id === editingId);
+      if (idx !== -1) {
+        stops[idx] = { ...stops[idx], day, type, name, mapsUrl,
+                       lat: coords.lat, lng: coords.lng, notes, photoUrl, startTime, endTime, bookingRef };
+      }
+      editingId = null;
+      document.getElementById('btn-add').textContent            = '+ Add Stop';
+      document.getElementById('btn-cancel-edit').style.display  = 'none';
+    } else {
+      stops.push({ id: Date.now(), day, type, name, mapsUrl,
+                   lat: coords.lat, lng: coords.lng, notes, photoUrl, startTime, endTime, bookingRef });
+    }
+    save();
+
+    // Clear form, keep day + type
+    document.getElementById('inp-name').value         = '';
+    document.getElementById('inp-maps').value         = '';
+    document.getElementById('inp-notes').value        = '';
+    document.getElementById('inp-photo').value        = '';
+    document.getElementById('inp-start').value        = '';
+    document.getElementById('inp-dur').value          = '';
+    document.getElementById('inp-end').value          = '';
+    document.getElementById('inp-booking-ref').value  = '';
+    renderBookingRefSelect();
+    clearStatus();
+
+    renderAll();
+    showTab('list');
+
+  } catch (e) {
+    setStatus('error', 'Network error — please try again.');
+  }
+
+  btn.disabled = false;
+}
+
+// Enter on name field
+document.getElementById('inp-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addStop();
+});
+
+// ─── Delete stop ──────────────────────────────────────────────────────
+function deleteStop(id) {
+  if (editingId === id) cancelEdit();   // cancel edit if deleting the stop being edited
+  stops = stops.filter(s => s.id !== id);
+  save();
+  renderAll();
+}
+
+// ─── Edit stop ────────────────────────────────────────────────────────
+function editStop(id) {
+  const s = stops.find(s => s.id === id);
+  if (!s) return;
+
+  // Pre-fill all form fields with current values
+  document.getElementById('inp-day').value   = s.day      || 1;
+  document.getElementById('inp-type').value  = s.type     || 'other';
+  document.getElementById('inp-maps').value  = s.mapsUrl  || '';
+  document.getElementById('inp-name').value  = s.name     || '';
+  document.getElementById('inp-notes').value = s.notes     || '';
+  document.getElementById('inp-photo').value = s.photoUrl  || '';
+  document.getElementById('inp-start').value = s.startTime || '';
+  document.getElementById('inp-dur').value   =
+    (s.startTime && s.endTime) ? durToStr(toMins(s.endTime) - toMins(s.startTime)) : '';
+  document.getElementById('inp-end').value   = s.endTime   || '';
+
+  // Booking reference
+  const bkSel = document.getElementById('inp-booking-ref');
+  if (bkSel) {
+    bkSel.value = s.bookingRef || '';
+    // Update the * required marker to match
+    const req = document.getElementById('maps-url-required');
+    if (req) req.style.display = s.bookingRef ? 'none' : '';
+  }
+
+  // Switch UI to edit mode
+  editingId = id;
+  document.getElementById('btn-add').textContent            = '✓ Save Changes';
+  document.getElementById('btn-cancel-edit').style.display  = 'block';
+  clearStatus();
+  showTab('add');
+  document.getElementById('inp-name').focus();
+}
+
+// ─── Cancel edit ──────────────────────────────────────────────────────
+function cancelEdit() {
+  editingId = null;
+  document.getElementById('btn-add').textContent            = '+ Add Stop';
+  document.getElementById('btn-cancel-edit').style.display  = 'none';
+  document.getElementById('inp-name').value  = '';
+  document.getElementById('inp-maps').value  = '';
+  document.getElementById('inp-notes').value = '';
+  document.getElementById('inp-photo').value = '';
+  document.getElementById('inp-start').value = '';
+  document.getElementById('inp-dur').value   = '';
+  document.getElementById('inp-end').value   = '';
+  document.getElementById('inp-booking-ref').value = '';
+  renderBookingRefSelect();
+  clearStatus();
+}
+
+// ─── Move stop up / down ─────────────────────────────────────────────
+function moveStop(id, dir) {
+  const ordered = routeOrder();
+  const pos = ordered.findIndex(s => s.id === id);
+  if (pos === -1) return;
+  const newPos = pos + dir;
+  if (newPos < 0 || newPos >= ordered.length) return;
+
+  // Crossing a day boundary → adopt the neighbour's day
+  const moving   = ordered[pos];
+  const neighbor = ordered[newPos];
+  if (moving.day !== neighbor.day) moving.day = neighbor.day;
+
+  // Swap and rebuild the authoritative stops array in the new order
+  [ordered[pos], ordered[newPos]] = [ordered[newPos], ordered[pos]];
+  stops = ordered;
+  save();
+  renderAll();
+}
+
+// ─── Focus map on stop ────────────────────────────────────────────────
+function focusStop(id) {
+  const s = stops.find(s => s.id === id);
+  if (!s) return;
+  map.setView([s.lat, s.lng], 14, { animate: true });
+  if (markerMap[id]) markerMap[id].openPopup();
+}
+
+// ─── Tab switching ─────────────────────────────────────────────────────
+function showTab(which) {
+  document.getElementById('panel-add').classList.toggle('hidden',   which !== 'add');
+  document.getElementById('panel-list').classList.toggle('active',  which === 'list');
+  document.getElementById('panel-bookings').classList.toggle('hidden', which !== 'bookings');
+  document.getElementById('tab-add').classList.toggle('active',      which === 'add');
+  document.getElementById('tab-list').classList.toggle('active',     which === 'list');
+  document.getElementById('tab-bookings').classList.toggle('active', which === 'bookings');
+}
+
+function focusBooking(id) {
+  editBooking(id);   // fills form, switches to bookings tab, focuses first field
+  // After focus-scroll settles, scroll the matching card into view and flash it
+  setTimeout(() => {
+    const card = document.querySelector(`#bookings-list [data-id="${id}"]`);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    card.classList.remove('span-item--highlight');
+    void card.offsetWidth;   // force reflow so animation restarts cleanly
+    card.classList.add('span-item--highlight');
+    setTimeout(() => card.classList.remove('span-item--highlight'), 1200);
+  }, 50);
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────
+function esc(t) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(String(t)));
+  return d.innerHTML;
+}
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 3958.8, r = x => x * Math.PI / 180;
+  const a = Math.sin(r(lat2-lat1)/2)**2 +
+            Math.cos(r(lat1)) * Math.cos(r(lat2)) * Math.sin(r(lon2-lon1)/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// Route order: sort by day then by array index within same day
+function routeOrder() {
+  return [...stops].sort((a, b) => {
+    const da = a.day || 999, db = b.day || 999;
+    if (da !== db) return da - db;
+    return stops.indexOf(a) - stops.indexOf(b);
+  });
+}
+
+// Route order augmented with multi-day span items (virtual stops)
+function routeOrderWithSpans() {
+  const base = routeOrder();
+  const virtuals = [];
+  spanItems.forEach(si => {
+    if (!si.inRoute || !si.lat) return;
+    const s = si.startDay || 1, e = si.endDay || s;
+    for (let d = s; d <= e; d++) {
+      virtuals.push({
+        id:         `span_${si.id}_${d}`,
+        _spanId:    si.id,
+        day:        d,
+        lat:        si.lat,
+        lng:        si.lng,
+        name:       si.name,
+        type:       '_span',
+        _color:     SPAN_TYPES[si.type]?.color || '#94A3B8',
+        _isVirtual: true,
+        startTime:  d === s ? (si.checkIn  || null) : null,
+        endTime:    d === e ? (si.checkOut || null) : null,
+        mapsUrl:    si.mapsUrl || null,
+        notes:      si.notes   || null,
+      });
+    }
+  });
+  return [...base, ...virtuals].sort((a, b) => {
+    const da = a.day || 999, db = b.day || 999;
+    if (da !== db) return da - db;
+    if (a._isVirtual !== b._isVirtual) return a._isVirtual ? 1 : -1;
+    return base.indexOf(a) - base.indexOf(b);
+  });
+}
+
+// ─── Map pin for span items ────────────────────────────────────────────
+function spanPinIcon(si) {
+  const color  = SPAN_TYPES[si.type]?.color || '#94A3B8';
+  const W = 76, BADGE_H = 24, TRI_H = 8;
+  const totalH = BADGE_H + TRI_H;
+  const label  = si.name.length > 10 ? si.name.slice(0, 9) + '…' : si.name;
+  const dStr   = si.startDay === si.endDay
+    ? `Day ${si.startDay}` : `D${si.startDay}–${si.endDay}`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${totalH}">
+    <defs><filter id="ssd" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="rgba(0,0,0,.5)"/>
+    </filter></defs>
+    <rect x="0" y="0" width="${W}" height="${BADGE_H}" rx="7" ry="7"
+          fill="${color}" filter="url(#ssd)" stroke="rgba(255,255,255,.25)" stroke-width="1"/>
+    <polygon points="${W/2-6},${BADGE_H} ${W/2+6},${BADGE_H} ${W/2},${totalH}" fill="${color}"/>
+    <text x="${W/2}" y="${BADGE_H*0.36}" dominant-baseline="central" text-anchor="middle"
+      font-family="-apple-system,BlinkMacSystemFont,sans-serif"
+      font-size="8.5" font-weight="700" fill="white">${label}</text>
+    <text x="${W/2}" y="${BADGE_H*0.74}" dominant-baseline="central" text-anchor="middle"
+      font-family="-apple-system,BlinkMacSystemFont,sans-serif"
+      font-size="7.5" font-weight="600" fill="rgba(255,255,255,.7)">${dStr}</text>
+  </svg>`;
+  return L.divIcon({ html: svg, className: '', iconSize: [W, totalH],
+                     iconAnchor: [W/2, totalH], popupAnchor: [0, -(totalH+4)] });
+}
+
+// ─── Time helpers ────────────────────────────────────────────────────
+const toMins     = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m; };
+const minsToTime = m => {
+  m = Math.max(0, Math.min(1439, m));
+  return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+};
+
+// ─── Duration helpers ─────────────────────────────────────────────────
+// Parse "H:MM" / "HH:MM" or plain minutes ("90") → number of minutes, or null
+function parseDur(v) {
+  if (!v || !v.trim()) return null;
+  v = v.trim();
+  const c = v.match(/^(\d{1,2}):(\d{1,2})$/);
+  if (c) return parseInt(c[1], 10) * 60 + parseInt(c[2], 10);
+  const n = v.match(/^\d+$/);
+  if (n) return parseInt(v, 10);
+  return null;
+}
+// Format minutes as "H:MM"
+function durToStr(m) {
+  return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0');
+}
+
+// Three-way auto-calculation: changing any one field derives the third
+//   Start + Duration  → End
+//   End   + Duration  → Start
+//   Start + End       → Duration  (times take priority over duration)
+function calcTimeFields(changed) {
+  const start = document.getElementById('inp-start').value;
+  const end   = document.getElementById('inp-end').value;
+  const dur   = parseDur(document.getElementById('inp-dur').value);
+
+  if (changed === 'start') {
+    if (start && end) {
+      const d = toMins(end) - toMins(start);
+      document.getElementById('inp-dur').value = d >= 0 ? durToStr(d) : '';
+    } else if (start && dur !== null) {
+      document.getElementById('inp-end').value = minsToTime(toMins(start) + dur);
+    }
+  } else if (changed === 'end') {
+    if (start && end) {
+      const d = toMins(end) - toMins(start);
+      document.getElementById('inp-dur').value = d >= 0 ? durToStr(d) : '';
+    } else if (end && dur !== null) {
+      document.getElementById('inp-start').value = minsToTime(toMins(end) - dur);
+    }
+  } else { // 'dur'
+    if (dur !== null && start) {
+      document.getElementById('inp-end').value = minsToTime(toMins(start) + dur);
+    } else if (dur !== null && end) {
+      document.getElementById('inp-start').value = minsToTime(toMins(end) - dur);
+    }
+  }
+}
+
+// ─── Itinerary view toggle ───────────────────────────────────────────
+function setItineraryView(v) {
+  timelineView = v === 'timeline';
+  document.getElementById('btn-view-list').classList.toggle('active', !timelineView);
+  document.getElementById('btn-view-timeline').classList.toggle('active', timelineView);
+  renderList();
+}
+
+// ─── Compressed-timeline segment builder ─────────────────────────────
+function buildTimelineSegs(timed) {
+  const HOUR_H   = 80;  // px per hour in active segments
+  const PAD_MINS = 45;  // padding around each stop's time window
+  const GAP_MIN  = 90;  // minimum gap (minutes) worth compressing
+  const GAP_H    = 28;  // fixed pixel height of a compressed gap strip
+
+  // Build padded active windows from each stop
+  const raw = timed.map(s => {
+    const a = toMins(s.startTime);
+    const b = s.endTime ? toMins(s.endTime) : a + 30;
+    return [Math.max(0, a - PAD_MINS), Math.min(1440, b + PAD_MINS)];
+  }).sort((a, b) => a[0] - b[0]);
+
+  // Merge overlapping windows
+  const merged = [];
+  for (const w of raw) {
+    if (merged.length && w[0] <= merged[merged.length - 1][1])
+      merged[merged.length - 1][1] = Math.max(merged[merged.length - 1][1], w[1]);
+    else merged.push([...w]);
+  }
+
+  // Build segment list (active + gap interleaved)
+  const segs = [];
+  let cur = 0;
+  for (const [ws, we] of merged) {
+    if (ws > cur) {
+      const d = ws - cur;
+      segs.push(d >= GAP_MIN
+        ? { gap: true,  startM: cur, endM: ws, h: GAP_H }
+        : { gap: false, startM: cur, endM: ws, h: (d / 60) * HOUR_H });
+    }
+    segs.push({ gap: false, startM: ws, endM: we, h: ((we - ws) / 60) * HOUR_H });
+    cur = we;
+  }
+  if (cur < 1440) {
+    const d = 1440 - cur;
+    segs.push(d >= GAP_MIN
+      ? { gap: true,  startM: cur, endM: 1440, h: GAP_H }
+      : { gap: false, startM: cur, endM: 1440, h: (d / 60) * HOUR_H });
+  }
+
+  // Assign topPx to each segment
+  let py = 0;
+  for (const seg of segs) { seg.topPx = py; py += seg.h; }
+  const totalH = py;
+
+  // minutes → pixel
+  const timeToY = m => {
+    m = Math.max(0, Math.min(1440, m));
+    for (const seg of segs) {
+      if (m <= seg.endM) {
+        if (seg.gap) return seg.topPx + seg.h / 2;
+        return seg.topPx + ((m - seg.startM) / (seg.endM - seg.startM)) * seg.h;
+      }
+    }
+    return totalH;
+  };
+
+  // pixel → minutes (used during drag)
+  const yToTime = px => {
+    px = Math.max(0, Math.min(totalH, px));
+    for (const seg of segs) {
+      if (px <= seg.topPx + seg.h) {
+        if (seg.gap) return px < seg.topPx + seg.h / 2 ? seg.startM : seg.endM;
+        return seg.startM + ((px - seg.topPx) / seg.h) * (seg.endM - seg.startM);
+      }
+    }
+    return 1440;
+  };
+
+  return { segs, totalH, timeToY, yToTime };
+}
+
+// ─── Timeline drag-and-drop ──────────────────────────────────────────
+function makeTlDraggable(block, s, timeToY, yToTime, totalH) {
+  const SNAP = 15;
+
+  block.addEventListener('mousedown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+
+    let dragging = false;
+    const startY        = e.clientY;
+    const origTop       = parseFloat(block.style.top) || 0;
+    const origStartMins = toMins(s.startTime);
+
+    const onMove = e => {
+      const dy = e.clientY - startY;
+      if (!dragging && Math.abs(dy) > 4) {
+        dragging = true;
+        block.classList.add('tl-block--dragging');
+      }
+      if (!dragging) return;
+
+      const blockH  = block.offsetHeight;
+      const newTop  = Math.max(0, Math.min(totalH - blockH, origTop + dy));
+      const rawMins = yToTime(newTop);
+      const snapped = Math.round(rawMins / SNAP) * SNAP;
+      block.style.top = timeToY(snapped) + 'px';
+
+      const t   = TYPES[s.type] || TYPES.other;
+      const dur = s.endTime ? toMins(s.endTime) - origStartMins : 30;
+      block.querySelector('.tl-block-time').innerHTML =
+        `${iconHtml(s.type, { size: 10, fill: t.color })} ` +
+        `${minsToTime(snapped)}${s.endTime ? ' \u2013 ' + minsToTime(snapped + dur) : ''}`;
+    };
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      block.classList.remove('tl-block--dragging');
+
+      if (!dragging) { focusStop(s.id); return; }
+
+      const newTop    = parseFloat(block.style.top) || 0;
+      const rawMins   = yToTime(newTop);
+      const newStartM = Math.round(rawMins / SNAP) * SNAP;
+      const dur       = s.endTime ? toMins(s.endTime) - origStartMins : null;
+      s.startTime     = minsToTime(newStartM);
+      if (dur !== null) s.endTime = minsToTime(newStartM + dur);
+      save();
+      renderList();
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  });
+}
+
+// ─── Auto-fetch driving data for timeline ────────────────────────────
+async function fetchTimelineDriving() {
+  if (tlFetchInProgress) return;
+  const route = routeOrder();
+  const pairs = [];
+  for (let i = 0; i < route.length - 1; i++) {
+    const from = route[i], to = route[i + 1];
+    if (!cachedDriveLegs.has(legKey(from.id, to.id)) && !isLegExcluded(from.id, to.id))
+      pairs.push([from, to]);
+  }
+  if (!pairs.length) return;
+
+  tlFetchInProgress = true;
+  let fetched = false;
+  for (const [from, to] of pairs) {
+    if (!timelineView) break;
+    try {
+      const ctrl = new AbortController();
+      const data = await fetchDrivingRoute([from, to], ctrl.signal);
+      if (data?.legs?.[0]) {
+        cachedDriveLegs.set(legKey(from.id, to.id),
+          { distance: data.legs[0].distance, duration: data.legs[0].duration });
+        fetched = true;
+      }
+    } catch { /* network / abort — skip silently */ }
+  }
+  tlFetchInProgress = false;
+  if (fetched && timelineView) renderList();
+}
+
+// ─── Span chip row helper ─────────────────────────────────────────────
+// Returns a DOM element (or null) with chips for span items covering `day`
+function makeSpanChipRow(day) {
+  const active = spanItems.filter(si => {
+    const s = si.startDay || 1, e = si.endDay || s;
+    return day >= s && day <= e;
+  });
+  if (!active.length) return null;
+  const row = document.createElement('div');
+  row.className = 'tl-span-row';
+  active.forEach(si => {
+    const color = SPAN_TYPES[si.type]?.color || '#94A3B8';
+    const days  = si.startDay === si.endDay ? `Day ${si.startDay}` : `Days ${si.startDay}–${si.endDay}`;
+    const times = si.checkIn ? ` · ${si.checkIn}${si.checkOut ? '–' + si.checkOut : ''}` : '';
+    const chip  = document.createElement('span');
+    chip.className = 'span-chip';
+    chip.style.cssText = `background:${color}22;color:${color};border-color:${color}66;`;
+    chip.textContent = si.name + times;
+    chip.title = `${SPAN_TYPES[si.type]?.label || 'Booking'} · ${days}${times}`;
+    chip.onclick = () => showTab('bookings');
+    row.appendChild(chip);
+  });
+  return row;
+}
+
+// ─── Timeline render ─────────────────────────────────────────────────
+function renderTimeline() {
+  const container = document.getElementById('stop-list-container');
+  container.innerHTML = '';
+
+  const fmtH   = m => String(Math.floor(m / 60)).padStart(2, '0') + ':00';
+  const fmtGap = m => m >= 1440 ? '24:00' : minsToTime(m);
+
+  const route = routeOrder();
+  const byDay = {};
+  route.forEach(s => { const k = s.day || 0; (byDay[k] = byDay[k] || []).push(s); });
+  // Include days covered only by span items
+  spanItems.forEach(si => {
+    const s = si.startDay || 1, e = si.endDay || s;
+    for (let d = s; d <= e; d++) { if (!byDay[d]) byDay[d] = []; }
+  });
+
+  Object.keys(byDay).map(Number).sort((a, b) => a - b)
+    .filter(d => activeDayFilter.size === 0 || activeDayFilter.has(d))
+    .forEach(day => {
+    const dayStops = byDay[day];
+    const timed    = dayStops.filter(s => s.startTime);
+    const untimed  = dayStops.filter(s => !s.startTime);
+
+    const section = document.createElement('div');
+    section.className = 'day-section';
+
+    // Day header (reuse existing style)
+    const cnt = dayStops.length;
+    const tlDayDateStr = day > 0 ? formatDayDate(day) : null;
+    section.innerHTML = `
+      <div class="day-header">
+        <span class="day-label">${day === 0 ? 'Unassigned' : 'Day ' + day}</span>
+        ${tlDayDateStr ? `<span class="day-date">${tlDayDateStr}</span>` : ''}
+        <div class="day-divider"></div>
+        <span class="day-count">${cnt
+          ? `${cnt} stop${cnt !== 1 ? 's' : ''}`
+          : 'Booking only'}</span>
+      </div>`;
+
+    // Span item chips for this day
+    const chipRow = makeSpanChipRow(day);
+    if (chipRow) section.appendChild(chipRow);
+
+    if (timed.length) {
+      const { segs, totalH, timeToY, yToTime } = buildTimelineSegs(timed);
+
+      const grid  = document.createElement('div');
+      grid.className = 'tl-grid';
+      grid.style.cssText = `height:${totalH}px; margin:6px 10px 8px;`;
+
+      const axis  = document.createElement('div');
+      axis.className = 'tl-axis';
+      axis.style.height = totalH + 'px';
+
+      const lanes = document.createElement('div');
+      lanes.className = 'tl-lanes';
+      lanes.style.height = totalH + 'px';
+
+      // Hour marks + gap strips
+      for (const seg of segs) {
+        if (seg.gap) {
+          // Axis: compressed-gap indicator
+          const gm = document.createElement('div');
+          gm.className = 'tl-gap-axis';
+          gm.style.cssText = `top:${seg.topPx}px; height:${seg.h}px;`;
+          gm.textContent = '≈';
+          axis.appendChild(gm);
+          // Lanes: hatched strip with time-range label
+          const gs = document.createElement('div');
+          gs.className = 'tl-gap-strip';
+          gs.style.cssText = `top:${seg.topPx}px; height:${seg.h}px;`;
+          gs.innerHTML = `<span class="tl-gap-label">${fmtGap(seg.startM)} – ${fmtGap(seg.endM)}</span>`;
+          lanes.appendChild(gs);
+        } else {
+          // Active segment: normal hour marks
+          const firstHour = Math.ceil(seg.startM / 60) * 60;
+          for (let m = firstHour; m <= seg.endM; m += 60) {
+            const top = timeToY(m);
+            const lbl = document.createElement('span');
+            lbl.className = 'tl-hour-label';
+            lbl.style.top = top + 'px';
+            lbl.textContent = fmtH(m);
+            axis.appendChild(lbl);
+            const line = document.createElement('div');
+            line.className = 'tl-hour-line';
+            line.style.top = top + 'px';
+            lanes.appendChild(line);
+          }
+        }
+      }
+
+      // Stop blocks
+      timed.forEach(s => {
+        const t       = TYPES[s.type] || TYPES.other;
+        const startM  = toMins(s.startTime);
+        const endM    = s.endTime ? toMins(s.endTime) : startM + 30;
+        const topPx   = timeToY(startM);
+        const hPx     = Math.max(36, timeToY(endM) - timeToY(startM));
+        const timeStr = s.startTime + (s.endTime ? ` – ${s.endTime}` : '');
+
+        // Booking reference badge
+        const tlLinkedSi = s.bookingRef ? spanItems.find(si => si.id === s.bookingRef) : null;
+        const tlBkBadge  = tlLinkedSi
+          ? (() => {
+              const c = SPAN_TYPES[tlLinkedSi.type]?.color || '#94A3B8';
+              return `<span class="booking-ref-badge"
+                           style="background:${c}22;color:${c}"
+                           title="Linked: ${esc(tlLinkedSi.name)}"
+                           onmousedown="event.stopPropagation()"
+                           onclick="event.stopPropagation(); focusBooking(${tlLinkedSi.id})">📋 ${esc(tlLinkedSi.name)}</span>`;
+            })()
+          : '';
+
+        const block = document.createElement('div');
+        block.className = 'tl-block';
+        block.style.cssText = `top:${topPx}px; height:${hPx}px;`
+          + `background:${t.color}20; border-left-color:${t.color};`;
+        block.title = s.name;
+        block.innerHTML = `
+          <div class="tl-block-name">${esc(s.name)}</div>
+          <div class="tl-block-time">${iconHtml(s.type, { size: 10, fill: t.color })} ${timeStr}</div>
+          ${tlBkBadge ? `<div class="tl-block-booking">${tlBkBadge}</div>` : ''}
+          <button class="tl-block-edit" title="Edit stop"
+            onmousedown="event.stopPropagation()"
+            onclick="event.stopPropagation(); editStop(${s.id})">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+              stroke="rgba(247,255,246,.8)" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>`;
+        makeTlDraggable(block, s, timeToY, yToTime, totalH);
+        lanes.appendChild(block);
+      });
+
+      // ── Driving blocks between consecutive pairs ─────────────────
+      for (let i = 0; i < dayStops.length - 1; i++) {
+        const from = dayStops[i], to = dayStops[i + 1];
+        if (!from.startTime || !to.startTime) continue;
+        if (isLegExcluded(from.id, to.id)) continue;
+        const fromEndM = from.endTime ? toMins(from.endTime) : toMins(from.startTime) + 30;
+        const toStartM = toMins(to.startTime);
+        const gapMins  = toStartM - fromEndM;
+        if (gapMins <= 0) continue;
+        const legData  = cachedDriveLegs.get(legKey(from.id, to.id));
+        const topPx    = timeToY(fromEndM);
+        const hPx      = Math.max(20, timeToY(toStartM) - timeToY(fromEndM));
+        let label, isWarn, isLoading;
+        if (legData) {
+          const dm = Math.ceil(legData.duration / 60);
+          isWarn    = dm > gapMins;
+          isLoading = false;
+          label     = `🚗 ${formatTime(legData.duration)}${isWarn ? ' \u26a0' : ''}`;
+        } else {
+          isWarn = false; isLoading = true; label = '\u00b7\u00b7\u00b7';
+        }
+        const db = document.createElement('div');
+        db.className = `tl-drive-block${isWarn ? ' tl-drive-block--warn' : ''}${isLoading ? ' tl-drive-block--loading' : ''}`;
+        db.style.cssText = `top:${topPx}px; height:${hPx}px;`;
+        db.innerHTML = `<span class="tl-drive-label">${label}</span>`;
+        lanes.appendChild(db);
+      }
+
+      grid.appendChild(axis);
+      grid.appendChild(lanes);
+      section.appendChild(grid);
+    }
+
+    // Untimed stops
+    if (untimed.length) {
+      const unt = document.createElement('div');
+      unt.className = 'tl-no-time';
+      // Only show the label when there are also timed stops above
+      if (timed.length) {
+        const lbl = document.createElement('div');
+        lbl.className = 'tl-no-time-label';
+        lbl.textContent = 'No time set';
+        unt.appendChild(lbl);
+      }
+      untimed.forEach(s => {
+        const t    = TYPES[s.type] || TYPES.other;
+
+        // Booking reference badge
+        const miniLinkedSi = s.bookingRef ? spanItems.find(si => si.id === s.bookingRef) : null;
+        const miniBkBadge  = miniLinkedSi
+          ? (() => {
+              const c = SPAN_TYPES[miniLinkedSi.type]?.color || '#94A3B8';
+              return `<span class="booking-ref-badge"
+                           style="background:${c}22;color:${c}"
+                           title="Linked: ${esc(miniLinkedSi.name)}"
+                           onmousedown="event.stopPropagation()"
+                           onclick="event.stopPropagation(); focusBooking(${miniLinkedSi.id})">📋 ${esc(miniLinkedSi.name)}</span>`;
+            })()
+          : '';
+
+        const card = document.createElement('div');
+        card.className = 'tl-mini-card';
+        card.style.cssText = `border-left-color:${t.color};`;
+        card.onclick = () => focusStop(s.id);
+        card.innerHTML = `
+          <div class="tl-mini-card-name">${esc(s.name)}</div>
+          <div class="tl-mini-card-meta">${iconHtml(s.type, { size: 11, fill: t.color })} ${t.label}</div>
+          ${miniBkBadge ? `<div style="margin-top:3px">${miniBkBadge}</div>` : ''}
+          <button class="tl-block-edit" title="Edit stop"
+            onmousedown="event.stopPropagation()"
+            onclick="event.stopPropagation(); editStop(${s.id})">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+              stroke="rgba(247,255,246,.8)" stroke-width="2.2"
+              stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>`;
+        unt.appendChild(card);
+      });
+      // Wrap with padding matching the grid margin
+      unt.style.cssText = 'padding:4px 10px 12px;';
+      section.appendChild(unt);
+    }
+
+    container.appendChild(section);
+  });
+
+  // Kick off any missing driving-data fetches (non-blocking)
+  fetchTimelineDriving();
+}
+
+// ─── Render list ─────────────────────────────────────────────────────
+function renderList() {
+  const container = document.getElementById('stop-list-container');
+
+  // Update tab label
+  document.getElementById('tab-list').textContent =
+    stops.length ? `Itinerary (${stops.length})` : 'Itinerary';
+
+  renderDayFilter();
+
+  if (!stops.length && !spanItems.length) {
+    container.innerHTML = `
+      <div class="empty-state">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <circle cx="12" cy="10" r="3"/>
+          <path d="M12 2a8 8 0 0 0-8 8c0 5.5 7.4 12.6 7.7 12.9a.45.45 0 0 0 .6 0C12.6 22.6 20 15.5 20 10a8 8 0 0 0-8-8z"/>
+        </svg>
+        <p>No stops yet.<br>Use <strong>+ Add Stop</strong> to begin<br>building your route.</p>
+      </div>`;
+    return;
+  }
+
+  // Timeline view branch
+  if (timelineView) { renderTimeline(); return; }
+
+  // Global route order — used to find the next stop after each card
+  const routeOrdered = routeOrder();
+  const stopIdxMap   = new Map(routeOrdered.map((s, i) => [s.id, i]));
+
+  // Group by day (include days covered only by span items)
+  const byDay = {};
+  stops.forEach(s => {
+    const k = s.day || 0;
+    (byDay[k] = byDay[k] || []).push(s);
+  });
+  spanItems.forEach(si => {
+    const s = si.startDay || 1, e = si.endDay || s;
+    for (let d = s; d <= e; d++) { if (!byDay[d]) byDay[d] = []; }
+  });
+
+  container.innerHTML = '';
+  Object.keys(byDay).map(Number).sort((a,b) => a-b)
+    .filter(d => activeDayFilter.size === 0 || activeDayFilter.has(d))
+    .forEach(day => {
+    const dayStops = byDay[day];
+    const section  = document.createElement('div');
+    section.className = 'day-section';
+    const dayDateStr = day > 0 ? formatDayDate(day) : null;
+    section.innerHTML = `
+      <div class="day-header">
+        <span class="day-label">${day === 0 ? 'Unassigned' : `Day ${day}`}</span>
+        ${dayDateStr ? `<span class="day-date">${dayDateStr}</span>` : ''}
+        <div class="day-divider"></div>
+        <span class="day-count">${dayStops.length
+          ? `${dayStops.length} stop${dayStops.length !== 1 ? 's' : ''}`
+          : 'Booking only'}</span>
+      </div>
+      <div class="day-group-stops" data-day="${day}"></div>`;
+
+    const groupEl = section.querySelector('.day-group-stops');
+
+    // Span item chips above the stop cards
+    const chipRow2 = makeSpanChipRow(day);
+    if (chipRow2) { chipRow2.style.padding = '0 0 8px 0'; section.insertBefore(chipRow2, groupEl); }
+
+    dayStops.forEach(s => {
+      const t    = TYPES[s.type] || TYPES.other;
+
+      // Booking reference badge (if this stop is linked to a booking)
+      const linkedSi   = s.bookingRef ? spanItems.find(si => si.id === s.bookingRef) : null;
+      const bkBadge    = linkedSi
+        ? (() => {
+            const c = SPAN_TYPES[linkedSi.type]?.color || '#94A3B8';
+            return `<span class="booking-ref-badge"
+                         style="background:${c}22;color:${c}"
+                         title="Linked to booking: ${esc(linkedSi.name)}"
+                         onclick="focusBooking(${linkedSi.id})">📋 ${esc(linkedSi.name)}</span>`;
+          })()
+        : '';
+
+      const card = document.createElement('div');
+      card.className = 'stop-item';
+      card.dataset.id = s.id;
+      card.innerHTML = `
+        <div class="stop-top">
+          <div class="stop-badge" style="background:${t.color}20">${iconHtml(s.type, { size: 18 })}</div>
+          <div class="stop-body">
+            <div class="stop-name" title="${esc(s.name)}">${esc(s.name)}</div>
+            <div class="stop-meta">
+              <span class="type-pill" style="background:${t.color}20;color:${t.color}">${t.label}</span>
+              ${s.startTime ? `<span class="time-badge">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                     stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+                </svg>
+                ${s.startTime}${s.endTime ? ` – ${s.endTime}` : ''}
+              </span>` : ''}
+              ${bkBadge}
+            </div>
+          </div>
+          <div class="stop-actions">
+            <button class="btn-icon move" title="Move up" onclick="moveStop(${s.id},-1)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="18 15 12 9 6 15"/>
+              </svg>
+            </button>
+            <button class="btn-icon move" title="Move down" onclick="moveStop(${s.id}, 1)">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+            <button class="btn-icon edit" title="Edit stop" onclick="editStop(${s.id})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+            </button>
+            <button class="btn-icon" title="Show on map" onclick="focusStop(${s.id})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="10" r="3"/>
+                <path d="M12 2a8 8 0 0 0-8 8c0 5.5 7.4 12.6 7.7 12.9a.45.45 0 0 0 .6 0C12.6 22.6 20 15.5 20 10a8 8 0 0 0-8-8z"/>
+              </svg>
+            </button>
+            <button class="btn-icon del" title="Delete stop" onclick="deleteStop(${s.id})">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+        ${s.notes    ? `<div class="stop-notes-preview md-content">${renderMarkdown(s.notes)}</div>` : ''}
+        ${s.photoUrl ? `<img class="stop-photo-thumb" src="${esc(s.photoUrl)}" alt=""
+                            onerror="this.style.display='none'" />` : ''}`;
+      groupEl.appendChild(card);
+
+      // Leg connector to the next stop in route order
+      const myIdx   = stopIdxMap.get(s.id) ?? -1;
+      const nextStop = (myIdx >= 0 && myIdx + 1 < routeOrdered.length) ? routeOrdered[myIdx + 1] : null;
+      if (nextStop) {
+        const key      = legKey(s.id, nextStop.id);
+        const excluded = excludedLegs.has(key);
+        const driveData = cachedDriveLegs.get(key);
+        const badge    = driveData ? `${formatDist(driveData.distance)} — ${formatTime(driveData.duration)}` : '';
+        const showBadge = drivingMode && !excluded;
+
+        const conn = document.createElement('div');
+        conn.className = 'leg-connector';
+        conn.innerHTML = `
+          <button class="leg-toggle ${excluded ? 'excluded' : 'included'}"
+                  onclick="toggleLeg(${s.id}, ${nextStop.id})"
+                  title="${excluded ? 'Click to include this driving leg' : 'Click to skip this driving leg'}">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+              ${excluded
+                ? '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>'
+                : '<polyline points="20 6 9 17 4 12"/>'}
+            </svg>
+            ${excluded ? 'Skip' : 'Drive'}
+          </button>
+          <span class="leg-data-badge" id="leg-data-${key}"${showBadge ? '' : ' style="display:none"'}>${badge}</span>`;
+        groupEl.appendChild(conn);
+      }
+    });
+
+    container.appendChild(section);
+  });
+
+  // Sortable per day group — cross-day dragging supported
+  container.querySelectorAll('.day-group-stops').forEach(groupEl => {
+    Sortable.create(groupEl, {
+      group:        'roadtrip',
+      draggable:    '.stop-item',   // only stop cards are draggable (not leg connectors)
+      animation:    150,
+      ghostClass:   'sortable-ghost',
+      chosenClass:  'sortable-chosen',
+      onEnd(evt) {
+        // Rebuild stops array from current DOM order
+        const allCards = container.querySelectorAll('.stop-item');
+        stops = [...allCards].map(el => stops.find(s => s.id === +el.dataset.id)).filter(Boolean);
+        // If dragged to a different day group, update day property
+        if (evt.from !== evt.to) {
+          const stop = stops.find(s => s.id === +evt.item.dataset.id);
+          if (stop) stop.day = +evt.to.dataset.day;
+        }
+        save();
+        setTimeout(renderAll, 0); // defer re-render so Sortable finishes cleanly
+      },
+    });
+  });
+
+  // Note: distance stats are updated by updateMap() (handles both straight-line and driving mode)
+}
+
+// ─── Update map ──────────────────────────────────────────────────────
+async function updateMap() {
+  const myVersion = ++mapVersion;
+
+  // Cancel any pending OSRM request from a previous call
+  if (fetchController) { fetchController.abort(); fetchController = null; }
+
+  // Clear previous map state
+  clearDistanceMarkers();
+  routeLines.forEach(l => map.removeLayer(l)); routeLines = [];
+  Object.values(markerMap).forEach(m => map.removeLayer(m));
+  markerMap = {};
+
+  const statsEl = document.getElementById('trip-stats');
+  const distEl  = document.getElementById('total-distance');
+
+  if (!stops.length) { statsEl.style.display = 'none'; return; }
+
+  const route        = routeOrderWithSpans();
+  const visibleRoute = route.filter(s => {
+    if (s._isVirtual) return activeDayFilter.size === 0 || activeDayFilter.has(s.day || 0);
+    return visibleTypes.has(s.type || 'other') &&
+           (activeDayFilter.size === 0 || activeDayFilter.has(s.day || 0));
+  });
+  const coords       = [];
+
+  // Helper: build span item popup html
+  function spanPopupHtml(si) {
+    const color = SPAN_TYPES[si.type]?.color || '#94A3B8';
+    const label = SPAN_TYPES[si.type]?.label || 'Booking';
+    const startD = formatDayDate(si.startDay);
+    const endD   = si.endDay !== si.startDay ? formatDayDate(si.endDay) : null;
+    const days   = si.startDay === si.endDay
+      ? `Day ${si.startDay}${startD ? ' · ' + startD : ''}`
+      : `Days ${si.startDay}–${si.endDay}${startD ? ' · ' + startD + (endD ? ' → ' + endD : '') : ''}`;
+    const times = si.checkIn ? `Check-in: ${si.checkIn}${si.checkOut ? ' · Check-out: ' + si.checkOut : ''}` : '';
+    return `<div style="font-family:-apple-system,sans-serif;min-width:170px;max-width:220px">
+      <div style="font-weight:700;font-size:13px;line-height:1.3">${esc(si.name)}</div>
+      <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap">
+        <span style="background:${color};color:#fff;padding:2px 8px;border-radius:20px;
+                     font-size:10.5px;font-weight:700">${label}</span>
+        <span style="color:#aaa;font-size:11px">${days}</span>
+      </div>
+      ${times ? `<div style="font-size:11px;color:#888;margin-top:4px">${times}</div>` : ''}
+      ${si.notes ? `<div class="md-content" style="font-size:11px;color:#555;margin-top:4px">${renderMarkdown(si.notes)}</div>` : ''}
+      ${si.mapsUrl ? `<a href="${esc(si.mapsUrl)}" target="_blank" rel="noopener"
+        style="display:block;margin-top:6px;font-size:11px;color:#03B5AA;text-decoration:none">
+        📍 Open in Maps</a>` : ''}
+    </div>`;
+  }
+
+  // ── Build markers (synchronous) ──────────────────────────────────────
+  visibleRoute.forEach(s => {
+    // ── Virtual span-item stop: one marker per span item ──────────────
+    if (s._isVirtual) {
+      const mapKey = `span_${s._spanId}`;
+      if (markerMap[mapKey]) { coords.push([s.lat, s.lng]); return; } // already rendered
+      const si = spanItems.find(x => x.id === s._spanId);
+      if (!si) return;
+      const m = L.marker([si.lat, si.lng], { icon: spanPinIcon(si) })
+        .bindPopup(spanPopupHtml(si), { maxWidth: 240 })
+        .addTo(map);
+      markerMap[mapKey] = m;
+      coords.push([si.lat, si.lng]);
+      return;
+    }
+
+    // ── Regular stop ───────────────────────────────────────────────────
+    const t = TYPES[s.type] || TYPES.other;
+
+    const photoHtml = s.photoUrl
+      ? `<img src="${esc(s.photoUrl)}" style="width:100%;max-height:145px;object-fit:cover;
+                   border-radius:5px;margin-bottom:8px;display:block"
+              onerror="this.style.display='none'" />`
+      : '';
+    const mapsHtml = s.mapsUrl
+      ? `<a href="${esc(s.mapsUrl)}" target="_blank" rel="noopener"
+            style="display:inline-block;margin-top:7px;font-size:11px;
+                   color:#03B5AA;text-decoration:none">
+           📍 Open in Google Maps
+         </a>`
+      : '';
+    const notesHtml = s.notes
+      ? `<div class="md-content" style="font-size:12px;color:#555;line-height:1.45;margin-top:5px">${renderMarkdown(s.notes)}</div>`
+      : '';
+
+    const popup = `
+      <div style="font-family:-apple-system,sans-serif;min-width:190px;max-width:240px">
+        ${photoHtml}
+        <div style="font-weight:700;font-size:13.5px;line-height:1.3">${esc(s.name)}</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:5px;flex-wrap:wrap">
+          <span style="background:${t.color};color:#fff;padding:2px 9px;
+                       border-radius:20px;font-size:10.5px;font-weight:700;
+                       display:inline-flex;align-items:center;gap:4px">
+            ${iconHtml(s.type, { size: 11, fill: 'white' })} ${t.label}
+          </span>
+          <span style="color:#aaa;font-size:11px">Day ${s.day || '?'}</span>
+        </div>
+        ${notesHtml}
+        ${mapsHtml}
+      </div>`;
+
+    const marker = L.marker([s.lat, s.lng], { icon: pinIcon(s.type, s.day, s.photoUrl, s.startTime, s.endTime) })
+      .bindPopup(popup, { maxWidth: 260 });
+    if (markerOptions.name)
+      marker.bindTooltip(s.name, { permanent: true, direction: 'bottom', className: 'map-label', offset: [0, 4] });
+    marker.addTo(map);
+
+    const tooltipEl = marker.getTooltip()?.getElement();
+    if (tooltipEl) {
+      tooltipEl.style.color       = 'white';
+      tooltipEl.style.background  = t.color;
+      tooltipEl.style.borderColor = t.color;
+    }
+
+    markerMap[s.id] = marker;
+    coords.push([s.lat, s.lng]);
+  });
+
+  // ── Span items with location but NOT in route → still show marker ──────
+  spanItems.forEach(si => {
+    if (!si.lat || si.inRoute) return;
+    const mapKey = `span_${si.id}`;
+    if (markerMap[mapKey]) return;
+    const inDay = activeDayFilter.size === 0 ||
+      Array.from({length: (si.endDay||si.startDay) - (si.startDay||1) + 1}, (_,i) => (si.startDay||1)+i)
+           .some(d => activeDayFilter.has(d));
+    if (!inDay) return;
+    const m = L.marker([si.lat, si.lng], { icon: spanPinIcon(si) })
+      .bindPopup(spanPopupHtml(si), { maxWidth: 240 })
+      .addTo(map);
+    markerMap[mapKey] = m;
+    coords.push([si.lat, si.lng]);
+  });
+
+  // ── Route & stats ─────────────────────────────────────────────────────
+  // For route drawing: deduplicate consecutive same-spanId virtuals (overnight stays)
+  const routeForLines = visibleRoute.filter((s, i, arr) => {
+    if (!s._isVirtual) return true;
+    const prev = arr[i - 1];
+    return !(prev?._isVirtual && prev._spanId === s._spanId);
+  });
+
+  if (routeForLines.length < 2) {
+    statsEl.style.display = 'none';
+    if (coords.length === 1) map.setView(coords[0], 13);
+    return;
+  }
+
+  // Helper: draw a grey dashed line for an excluded leg
+  function drawExcludedLine(from, to) {
+    routeLines.push(L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+      color: '#556070', weight: 1.5, opacity: .45, dashArray: '4 8',
+    }).addTo(map));
+  }
+
+  if (drivingMode) {
+    // ── Driving mode ─────────────────────────────────────────────────
+    // Draw excluded legs as grey dashed immediately (sync)
+    for (let i = 1; i < routeForLines.length; i++) {
+      if (isLegExcluded(routeForLines[i-1].id, routeForLines[i].id))
+        drawExcludedLine(routeForLines[i-1], routeForLines[i]);
+    }
+
+    distEl.innerHTML = '<span style="opacity:.5">⏳ Fetching driving route…</span>';
+    statsEl.style.display = 'block';
+
+    const segments   = buildSegments(routeForLines);
+    let totalDist    = 0, totalDur = 0;
+    const newLegsMap = new Map();
+
+    for (const seg of segments) {
+      if (myVersion !== mapVersion) return;   // superseded by newer updateMap()
+      if (seg.length < 2) continue;
+
+      fetchController = new AbortController();
+      const driveData = await fetchDrivingRoute(seg, fetchController.signal);
+      fetchController = null;
+      if (myVersion !== mapVersion) return;
+
+      if (!driveData) {
+        // Fallback: straight teal dashed line for this segment
+        for (let i = 1; i < seg.length; i++) {
+          routeLines.push(L.polyline([[seg[i-1].lat, seg[i-1].lng], [seg[i].lat, seg[i].lng]], {
+            color: '#03B5AA', weight: 2.5, opacity: .75, dashArray: '9 7',
+          }).addTo(map));
+        }
+        continue;
+      }
+
+      // Actual road polyline (OSRM returns [lng, lat] → flip)
+      const roadCoords = driveData.geometry.coordinates.map(([lng, lat]) => [lat, lng]);
+      routeLines.push(L.polyline(roadCoords, { color: '#03B5AA', weight: 4, opacity: .85 }).addTo(map));
+
+      // Per-leg labels + data
+      driveData.legs.forEach((leg, i) => {
+        const from = seg[i], to = seg[i + 1];
+        const key  = legKey(from.id, to.id);
+        newLegsMap.set(key, { distance: leg.distance, duration: leg.duration });
+
+        // Update itinerary list badge in-place
+        const badgeEl = document.getElementById(`leg-data-${key}`);
+        if (badgeEl) {
+          badgeEl.textContent = `${formatDist(leg.distance)} — ${formatTime(leg.duration)}`;
+          badgeEl.style.display = '';
+        }
+
+        // Floating map label
+        distanceMarkers.push(
+          L.tooltip({ permanent: true, className: 'drive-dist-label', interactive: false, direction: 'center' })
+            .setLatLng([(from.lat + to.lat) / 2, (from.lng + to.lng) / 2])
+            .setContent(`${formatDist(leg.distance)} — ${formatTime(leg.duration)}`)
+            .addTo(map)
+        );
+      });
+
+      totalDist += driveData.distance;
+      totalDur  += driveData.duration;
+    }
+
+    cachedDriveLegs = newLegsMap;
+    distEl.innerHTML = totalDist > 0
+      ? `<strong>${formatDist(totalDist)}</strong> &nbsp;·&nbsp; ~${formatTime(totalDur)} driving`
+      : '<span style="opacity:.5">No included driving legs</span>';
+
+  } else {
+    // ── Straight-line mode ───────────────────────────────────────────
+    let miles = 0;
+    for (let i = 1; i < routeForLines.length; i++) {
+      const from = routeForLines[i-1], to = routeForLines[i];
+      const excl = isLegExcluded(from.id, to.id);
+      routeLines.push(L.polyline([[from.lat, from.lng], [to.lat, to.lng]], {
+        color:     excl ? '#556070' : '#03B5AA',
+        weight:    excl ? 1.5       : 2.5,
+        opacity:   excl ? .4        : .75,
+        dashArray: excl ? '4 8'     : '9 7',
+      }).addTo(map));
+      if (!excl) miles += haversine(from.lat, from.lng, to.lat, to.lng);
+    }
+    distEl.textContent =
+      `${Math.round(miles * 1.60934).toLocaleString()} km (straight-line)`;
+    statsEl.style.display = 'block';
+  }
+
+  // ── Fit view ─────────────────────────────────────────────────────────
+  if (coords.length === 1) map.setView(coords[0], 13);
+  else if (coords.length > 1) map.fitBounds(L.latLngBounds(coords), { padding: [50, 50] });
+}
+
+// ─── Filter bar ───────────────────────────────────────────────────────
+function shortLabel(label) {
+  // "Restaurant/Food" → "Food",  "Photo Stop" → "Photo",
+  // "Nature / Hike"   → "Nature", everything else → first word
+  if (label.includes('/')) return label.split('/').pop().trim();
+  return label.split(' ')[0];
+}
+
+function renderFilterBar() {
+  const chips = document.getElementById('filter-chips');
+  chips.innerHTML = Object.entries(TYPES).map(([key, t]) => {
+    const on  = visibleTypes.has(key);
+    const lbl = shortLabel(t.label);
+    const style = on
+      ? `background:${t.color}22;border-color:${t.color};color:${t.color}`
+      : '';
+    return `<button class="filter-chip${on ? '' : ' off'}"
+                    style="${style}"
+                    onclick="toggleTypeFilter('${key}')"
+                    title="${on ? 'Hide' : 'Show'} ${t.label}">
+              ${iconHtml(key, { size: 11, fill: on ? t.color : undefined })}
+              ${lbl}
+            </button>`;
+  }).join('');
+}
+
+function toggleTypeFilter(key) {
+  if (visibleTypes.has(key)) {
+    visibleTypes.delete(key);
+  } else {
+    visibleTypes.add(key);
+  }
+  renderFilterBar();
+  updateMap();
+}
+
+function setAllTypesVisible(all) {
+  if (all) {
+    Object.keys(TYPES).forEach(k => visibleTypes.add(k));
+  } else {
+    visibleTypes.clear();
+  }
+  renderFilterBar();
+  updateMap();
+}
+
+function toggleFilterBar() {
+  filterBarOpen = !filterBarOpen;
+  document.getElementById('filter-chips').classList.toggle('collapsed', !filterBarOpen);
+  document.getElementById('day-filter-section').classList.toggle('collapsed', !filterBarOpen);
+  document.getElementById('btn-filter-chevron').classList.toggle('open', filterBarOpen);
+}
+
+function renderDayFilter() {
+  const el   = document.getElementById('day-filter-section');
+  const spanDays = spanItems.flatMap(si => {
+    const s = si.startDay || 1, e = si.endDay || s;
+    return Array.from({ length: e - s + 1 }, (_, i) => s + i);
+  });
+  const days = [...new Set([...stops.map(s => s.day || 0), ...spanDays])].sort((a, b) => a - b);
+  if (days.length < 2) { el.style.display = 'none'; return; }
+  el.style.display = '';
+  if (!filterBarOpen) el.classList.add('collapsed');
+  else el.classList.remove('collapsed');
+
+  const allOff = activeDayFilter.size === 0;
+  el.innerHTML = `<div class="day-filter-hdr">
+    <span class="filter-bar-label" style="font-size:.63rem">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+        <line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/>
+        <line x1="3" y1="10" x2="21" y2="10"/>
+      </svg>
+      Days
+    </span>
+    <button class="btn-filter-ctrl" onclick="clearDayFilter()"
+      style="${allOff ? 'border-color:rgba(247,255,246,.4);color:#F7FFF6' : ''}">All</button>
+  </div>` +
+  days.map(d => {
+    const on      = activeDayFilter.has(d);
+    const label   = d === 0 ? 'Unassigned' : `Day ${d}`;
+    const dateStr = d > 0 ? formatDayDate(d) : null;
+    return `<button class="filter-chip${on ? '' : ' off'}"
+      style="${on ? 'background:rgba(3,181,170,.18);border-color:#03B5AA;color:#03B5AA' : ''}"
+      onclick="toggleDayFilter(${d})"
+      title="${on ? 'Deselect' : 'Show only'} ${label}${dateStr ? ' · ' + dateStr : ''}">
+      ${label}${dateStr ? `<span style="display:block;font-size:.6rem;opacity:.7;margin-top:1px">${dateStr}</span>` : ''}
+    </button>`;
+  }).join('');
+}
+
+function toggleDayFilter(d) {
+  if (activeDayFilter.has(d)) activeDayFilter.delete(d);
+  else activeDayFilter.add(d);
+  renderDayFilter();
+  updateMap();
+  renderList();
+}
+
+function clearDayFilter() {
+  activeDayFilter.clear();
+  renderDayFilter();
+  updateMap();
+  renderList();
+}
+
+// ─── Driving mode toggle ──────────────────────────────────────────────
+function toggleDrivingMode() {
+  drivingMode = !drivingMode;
+  const btn = document.getElementById('btn-drive-toggle');
+  btn.classList.toggle('active', drivingMode);
+  btn.title = drivingMode ? 'Switch to straight-line route' : 'Show driving route & distances';
+  if (!drivingMode) {
+    // Cancel any in-flight request and clear labels immediately
+    if (fetchController) { fetchController.abort(); fetchController = null; }
+    clearDistanceMarkers();
+  }
+  updateMap();
+}
+
+// ─── Sidebar collapse ─────────────────────────────────────────────────
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  document.querySelector('.sidebar').classList.toggle('collapsed', sidebarCollapsed);
+  const handle = document.getElementById('sidebar-handle');
+  handle.title = sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
+  // let the CSS transition finish before telling Leaflet to resize
+  setTimeout(() => map && map.invalidateSize(), 300);
+}
+
+// ─── Marker display options ───────────────────────────────────────────
+function toggleMarkerOptsPanel(e) {
+  e.stopPropagation();
+  markerOptsOpen = !markerOptsOpen;
+  document.getElementById('marker-opts-panel').classList.toggle('open', markerOptsOpen);
+  document.getElementById('btn-map-toggle').classList.toggle('active', markerOptsOpen);
+}
+
+function setMarkerOpt(key) {
+  markerOptions[key] = !markerOptions[key];
+  renderMarkerOpts();
+  updateMap();
+}
+
+function renderMarkerOpts() {
+  const opts = [
+    { key: 'photo', label: 'Photo', icon: '📷' },
+    { key: 'day',   label: 'Day',   icon: '📅' },
+    { key: 'type',  label: 'Type',  icon: '🏷' },
+    { key: 'time',  label: 'Time',  icon: '🕐' },
+    { key: 'name',  label: 'Name',  icon: '✏️' },
+  ];
+  document.getElementById('marker-opts-grid').innerHTML = opts.map(o => {
+    const on = markerOptions[o.key];
+    return `<button class="marker-opt-btn ${on ? 'on' : 'off'}" onclick="setMarkerOpt('${o.key}')">
+      ${o.icon} ${o.label}
+    </button>`;
+  }).join('');
+}
+
+// ─── Trip bar ─────────────────────────────────────────────────────────
+// ─── Trip date helpers ────────────────────────────────────────────────
+/** Returns a Date object for the given day number (1-based), or null. */
+function dayToDate(day) {
+  if (!startDate || !day || day < 1) return null;
+  const [y, m, d] = startDate.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  dt.setDate(dt.getDate() + day - 1);
+  return dt;
+}
+
+/** Formats a day number as "Mon 23 Jun" (or null if no start date set). */
+function formatDayDate(day) {
+  const dt = dayToDate(day);
+  if (!dt) return null;
+  return dt.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+function setTripStartDate(val) {
+  startDate = val;
+  save();
+  // Sync the input + clear button
+  const inp = document.getElementById('inp-trip-start');
+  const clr = document.getElementById('btn-trip-date-clear');
+  if (inp) inp.value = val;
+  if (clr) clr.style.display = val ? '' : 'none';
+  renderAll();
+}
+
+function renderTripBar() {
+  const sel = document.getElementById('trip-select');
+  sel.innerHTML = trips.map(t =>
+    `<option value="${t.id}"${t.id === activeId ? ' selected' : ''}>${esc(t.name)}</option>`
+  ).join('');
+  document.getElementById('btn-trip-del').disabled = trips.length <= 1;
+  // Sync date input with the active trip's start date
+  const inp = document.getElementById('inp-trip-start');
+  const clr = document.getElementById('btn-trip-date-clear');
+  if (inp) inp.value = startDate || '';
+  if (clr) clr.style.display = startDate ? '' : 'none';
+}
+
+function switchTrip(id) {
+  save();                                          // persist current trip's stops first
+  activeId = id;
+  const _trip  = trips.find(t => t.id === id);
+  stops        = _trip?.stops       ?? [];
+  spanItems    = _trip?.spanItems   ?? [];
+  startDate    = _trip?.startDate   ?? '';
+  description  = _trip?.description ?? '';
+  excludedLegs = new Set((_trip?.excludedLegs || []).map(([a, b]) => legKey(a, b)));
+  cachedDriveLegs = new Map();                     // clear driving cache for new trip
+  if (editingId !== null) cancelEdit();            // exit edit mode on trip switch
+  renderTripBar();
+  renderAll();
+}
+
+function createTrip() {
+  const name = prompt('Trip name:', 'New Trip');
+  if (!name?.trim()) return;
+  const t = { id: Date.now(), name: name.trim(), stops: [] };
+  trips.push(t);
+  save();
+  switchTrip(t.id);
+}
+
+function renameTrip() {
+  const t = trips.find(t => t.id === activeId);
+  if (!t) return;
+  const name = prompt('Rename trip:', t.name);
+  if (!name?.trim()) return;
+  t.name = name.trim();
+  save();
+  renderTripBar();
+}
+
+function deleteCurrentTrip() {
+  if (trips.length <= 1) return;
+  const t = trips.find(t => t.id === activeId);
+  if (!confirm(`Delete "${t?.name}"? This cannot be undone.`)) return;
+  trips = trips.filter(t => t.id !== activeId);
+  save();
+  switchTrip(trips[trips.length - 1].id);         // switch to last remaining trip
+}
+
+// ─── Booking management ───────────────────────────────────────────────
+function setBkStatus(type, text) {
+  const el = document.getElementById('bk-status-msg');
+  el.className = `status-msg show ${type}`;
+  const icon = document.getElementById('bk-status-icon');
+  icon.className   = type === 'loading' ? 'spinner' : '';
+  icon.textContent = type === 'error' ? '⚠' : type === 'ok' ? '✓' : '';
+  document.getElementById('bk-status-text').textContent = text;
+}
+function clearBkStatus() { document.getElementById('bk-status-msg').className = 'status-msg'; }
+
+function clearBookingForm() {
+  document.getElementById('bk-name').value      = '';
+  document.getElementById('bk-type').value      = 'accommodation';
+  document.getElementById('bk-start-day').value = 1;
+  document.getElementById('bk-end-day').value   = 1;
+  document.getElementById('bk-checkin').value   = '';
+  document.getElementById('bk-checkout').value  = '';
+  document.getElementById('bk-maps').value      = '';
+  document.getElementById('bk-inroute').checked = false;
+  document.getElementById('bk-notes').value     = '';
+  clearBkStatus();
+}
+
+async function addBooking() {
+  const name     = document.getElementById('bk-name').value.trim();
+  const type     = document.getElementById('bk-type').value;
+  const startDay = Math.max(1, parseInt(document.getElementById('bk-start-day').value) || 1);
+  const endDay   = Math.max(startDay, parseInt(document.getElementById('bk-end-day').value) || startDay);
+  const checkIn  = document.getElementById('bk-checkin').value;
+  const checkOut = document.getElementById('bk-checkout').value;
+  const mapsUrl  = document.getElementById('bk-maps').value.trim();
+  const inRoute  = document.getElementById('bk-inroute').checked;
+  const notes    = document.getElementById('bk-notes').value.trim();
+  const btn      = document.getElementById('btn-booking-add');
+
+  if (!name) { document.getElementById('bk-name').focus(); return; }
+
+  let lat = null, lng = null;
+  if (mapsUrl) {
+    btn.disabled = true;
+    setBkStatus('loading', 'Locating…');
+    let coords = parseMapUrl(mapsUrl);
+    if (!coords && editingSpanId !== null) {
+      const orig = spanItems.find(s => s.id === editingSpanId);
+      if (orig && orig.mapsUrl === mapsUrl) { lat = orig.lat; lng = orig.lng; }
+    }
+    if (!coords && lat === null) {
+      if (/goo\.gl|maps\.app/i.test(mapsUrl)) {
+        setBkStatus('error', 'Short link — use full URL from address bar.');
+        btn.disabled = false; return;
+      }
+      coords = await geocode(name);
+    }
+    if (coords) { lat = coords.lat; lng = coords.lng; }
+    else if (lat === null) {
+      setBkStatus('error', 'Could not find location. Check the URL.');
+      btn.disabled = false; return;
+    }
+    clearBkStatus();
+    btn.disabled = false;
+  }
+
+  const item = { name, type, startDay, endDay, checkIn, checkOut,
+                 mapsUrl, lat, lng, inRoute: inRoute && lat !== null, notes };
+
+  if (editingSpanId !== null) {
+    const idx = spanItems.findIndex(s => s.id === editingSpanId);
+    if (idx !== -1) spanItems[idx] = { ...spanItems[idx], ...item };
+    editingSpanId = null;
+    document.getElementById('btn-booking-add').textContent       = '+ Add Booking';
+    document.getElementById('btn-booking-cancel').style.display  = 'none';
+  } else {
+    spanItems.push({ id: Date.now(), ...item });
+  }
+
+  clearBookingForm();
+  save();
+  renderBookings();
+  updateMap();
+  renderList();
+}
+
+function editBooking(id) {
+  const si = spanItems.find(s => s.id === id);
+  if (!si) return;
+  document.getElementById('bk-name').value      = si.name      || '';
+  document.getElementById('bk-type').value      = si.type      || 'accommodation';
+  document.getElementById('bk-start-day').value = si.startDay  || 1;
+  document.getElementById('bk-end-day').value   = si.endDay    || si.startDay || 1;
+  document.getElementById('bk-checkin').value   = si.checkIn   || '';
+  document.getElementById('bk-checkout').value  = si.checkOut  || '';
+  document.getElementById('bk-maps').value      = si.mapsUrl   || '';
+  document.getElementById('bk-inroute').checked = si.inRoute   || false;
+  document.getElementById('bk-notes').value     = si.notes     || '';
+  editingSpanId = id;
+  document.getElementById('btn-booking-add').textContent      = '✓ Save Booking';
+  document.getElementById('btn-booking-cancel').style.display = 'block';
+  clearBkStatus();
+  showTab('bookings');
+  document.getElementById('bk-name').focus();
+}
+
+function cancelBookingEdit() {
+  editingSpanId = null;
+  document.getElementById('btn-booking-add').textContent      = '+ Add Booking';
+  document.getElementById('btn-booking-cancel').style.display = 'none';
+  clearBookingForm();
+}
+
+function deleteBooking(id) {
+  spanItems = spanItems.filter(s => s.id !== id);
+  save();
+  renderBookings();
+  updateMap();
+  renderList();
+}
+
+function renderBookings() {
+  const listEl = document.getElementById('bookings-list');
+  if (!listEl) return;
+  if (!spanItems.length) {
+    listEl.innerHTML = '<div style="color:rgba(247,255,246,.3);font-size:.78rem;padding:4px 0">No bookings yet.</div>';
+    return;
+  }
+  listEl.innerHTML = '';
+  [...spanItems].sort((a, b) => (a.startDay || 0) - (b.startDay || 0)).forEach(si => {
+    const color  = SPAN_TYPES[si.type]?.color || '#94A3B8';
+    const label  = SPAN_TYPES[si.type]?.label || 'Other';
+    const bkStartDate = formatDayDate(si.startDay);
+    const bkEndDate   = si.endDay !== si.startDay ? formatDayDate(si.endDay) : null;
+    const days   = si.startDay === si.endDay
+      ? `Day ${si.startDay}${bkStartDate ? ' · ' + bkStartDate : ''}`
+      : `Days ${si.startDay}–${si.endDay}${bkStartDate ? ' · ' + bkStartDate + (bkEndDate ? ' → ' + bkEndDate : '') : ''}`;
+    const times  = [si.checkIn, si.checkOut].filter(Boolean).join(' – ');
+    const div = document.createElement('div');
+    div.className = 'span-item';
+    div.dataset.id = si.id;
+    div.innerHTML = `
+      <div class="span-item-top">
+        <span class="span-item-dot" style="background:${color}"></span>
+        <span class="span-item-name">${esc(si.name)}</span>
+        <div class="span-item-actions">
+          <button class="btn-icon edit" title="Edit" onclick="editBooking(${si.id})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+          </button>
+          <button class="btn-icon del" title="Delete" onclick="deleteBooking(${si.id})">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                 stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div class="span-item-meta">
+        <span style="background:${color}22;color:${color};padding:1px 7px;border-radius:20px;
+                     font-weight:700;font-size:.68rem">${label}</span>
+        <span>${days}</span>
+        ${times  ? `<span>🕐 ${times}</span>` : ''}
+        ${si.lat ? `<span style="color:rgba(247,255,246,.3)">📍</span>` : ''}
+        ${si.inRoute ? '<span class="span-inroute-badge">🔀 In route</span>' : ''}
+      </div>
+      ${si.notes ? `<div class="md-content" style="font-size:.7rem;color:rgba(247,255,246,.38);margin-top:1px">${renderMarkdown(si.notes)}</div>` : ''}`;
+    listEl.appendChild(div);
+  });
+
+  // Keep the booking-ref dropdown in the stop form in sync
+  renderBookingRefSelect();
+}
+
+// ─── Render both ─────────────────────────────────────────────────────
+function renderAll() { renderTripBar(); renderFilterBar(); renderList(); updateMap(); renderBookings(); renderTripDescBar(); }
+
+// ─── Close marker-opts panel on outside click ─────────────────────────
+document.addEventListener('click', () => {
+  if (!markerOptsOpen) return;
+  markerOptsOpen = false;
+  document.getElementById('marker-opts-panel').classList.remove('open');
+  document.getElementById('btn-map-toggle').classList.remove('active');
+});
+
+// ─── Service Worker Registration ──────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// ─── Markdown (marked.js) ─────────────────────────────────────────────
+if (typeof marked !== 'undefined') {
+  marked.use({ breaks: true, gfm: true });
+}
+function renderMarkdown(text) {
+  if (!text?.trim()) return '';
+  if (typeof marked === 'undefined') {
+    // Fallback: plain text with escaping
+    return '<p>' + esc(text).replace(/\n/g, '<br>') + '</p>';
+  }
+  return marked.parse(text);
+}
+
+// ─── Trip Description ─────────────────────────────────────────────────
+function toggleTripDesc() {
+  const body = document.getElementById('trip-desc-body');
+  const icon = document.getElementById('trip-desc-icon');
+  if (!body) return;
+  const opening = body.classList.contains('hidden');
+  body.classList.toggle('hidden', !opening);
+  icon.classList.toggle('open', opening);
+  icon.textContent = opening ? '▾' : '▸';
+}
+
+function editTripDesc() {
+  const view = document.getElementById('trip-desc-view');
+  const edit = document.getElementById('trip-desc-edit');
+  if (!view || !edit) return;
+  edit.value = description;
+  view.classList.add('hidden');
+  edit.classList.remove('hidden');
+  edit.focus();
+}
+
+function saveTripDesc() {
+  const edit = document.getElementById('trip-desc-edit');
+  if (!edit) return;
+  description = edit.value;
+  save();
+  renderTripDescBar();
+}
+
+function renderTripDescBar() {
+  const view = document.getElementById('trip-desc-view');
+  const edit = document.getElementById('trip-desc-edit');
+  if (!view) return;
+  view.innerHTML = renderMarkdown(description);
+  view.classList.remove('hidden');
+  if (edit) edit.classList.add('hidden');
+  const lbl = document.getElementById('trip-desc-label');
+  if (lbl) lbl.textContent = 'Trip notes';
+}
+
+// ─── Toast Notification ───────────────────────────────────────────────
+function showToast(msg, duration = 3000) {
+  let t = document.getElementById('pwa-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'pwa-toast';
+    t.className = 'toast';
+    document.body.appendChild(t);
+  }
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), duration);
+}
+
+// ─── Offline Pill ─────────────────────────────────────────────────────
+function setPill() {
+  const pill = document.getElementById('offline-pill');
+  if (pill) pill.classList.toggle('hidden', navigator.onLine);
+}
+window.addEventListener('online',  setPill);
+window.addEventListener('offline', setPill);
+
+// ─── Sync Button Renderer ─────────────────────────────────────────────
+function renderSyncBtn(state, msg) {
+  const btn = document.getElementById('btn-sync');
+  if (!btn) return;
+  btn.classList.remove('sync-synced', 'sync-error', 'sync-offline', 'btn-sync-spinning');
+  // Remove existing badge
+  const existing = btn.querySelector('.sync-time-badge');
+  if (existing) existing.remove();
+
+  const cloudSVG = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>
+  </svg>`;
+  const checkSVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="20 6 9 17 4 12"/>
+  </svg>`;
+  const xSVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+  </svg>`;
+
+  if (state === 'syncing') {
+    btn.classList.add('btn-sync-spinning');
+    btn.innerHTML = cloudSVG;
+    btn.title = 'Syncing…';
+  } else if (state === 'synced') {
+    btn.classList.add('sync-synced');
+    btn.innerHTML = cloudSVG + `<span class="sync-time-badge">${checkSVG}</span>`;
+    lastSyncTime = Date.now();
+    btn.title = 'Synced just now';
+    // Update time label every minute
+    clearInterval(btn._syncInterval);
+    btn._syncInterval = setInterval(() => {
+      if (!lastSyncTime) return;
+      const mins = Math.round((Date.now() - lastSyncTime) / 60000);
+      const lbl = btn.querySelector('.sync-time-badge');
+      if (lbl) lbl.innerHTML = mins < 1 ? checkSVG : `${mins}m`;
+      btn.title = mins < 1 ? 'Synced just now' : `Synced ${mins} min ago`;
+    }, 30000);
+  } else if (state === 'error') {
+    btn.classList.add('sync-error');
+    btn.innerHTML = cloudSVG + `<span class="sync-time-badge">${xSVG}</span>`;
+    btn.title = msg ? `Sync error: ${msg}` : 'Sync error';
+  } else if (state === 'offline') {
+    btn.classList.add('sync-offline');
+    btn.innerHTML = cloudSVG;
+    btn.title = 'Offline — cannot sync';
+  } else {
+    // idle / unconfigured
+    btn.innerHTML = cloudSVG;
+    btn.title = state === 'unconfigured' ? 'Set up GitHub sync' : 'Sync with GitHub';
+  }
+}
+
+// ─── GitHub API Helpers ───────────────────────────────────────────────
+function ghBase() {
+  const { owner, repo, path } = githubSettings;
+  return `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+}
+
+async function ghFetch(method, body) {
+  return fetch(ghBase(), {
+    method,
+    headers: {
+      Authorization: `Bearer ${githubSettings.pat}`,
+      Accept: 'application/vnd.github.v3+json',
+      'Content-Type': 'application/json',
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+}
+
+async function ghGetData() {
+  const res = await ghFetch('GET');
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`GitHub ${res.status}`);
+  const json = await res.json();
+  const content = JSON.parse(atob(json.content.replace(/\s/g, '')));
+  return { content, sha: json.sha };
+}
+
+async function ghPutData(data, sha) {
+  const body = {
+    message: `Sync trips – ${new Date().toISOString()}`,
+    content: btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2)))),
+  };
+  if (sha) body.sha = sha;
+  const res = await ghFetch('PUT', body);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || `GitHub ${res.status}`);
+  }
+}
+
+// ─── Sync Data ────────────────────────────────────────────────────────
+async function syncData() {
+  if (!githubSettings.pat || !githubSettings.owner || !githubSettings.repo) {
+    openSettings();
+    return;
+  }
+  if (!navigator.onLine) {
+    renderSyncBtn('offline');
+    showToast('You\'re offline — sync skipped');
+    return;
+  }
+  renderSyncBtn('syncing');
+  try {
+    const local  = JSON.parse(localStorage.getItem('roadtrip-v3') || '{}');
+    const remote = await ghGetData();
+    if (!remote) {
+      // First push — no remote file yet
+      await ghPutData(local, null);
+      showToast('Data pushed to GitHub ✓');
+    } else if ((remote.content.savedAt || 0) > (local.savedAt || 0)) {
+      // Remote is newer → pull
+      localStorage.setItem('roadtrip-v3', JSON.stringify(remote.content));
+      loadData();
+      renderAll();
+      renderBookings();
+      renderTripDescBar();
+      showToast('Pulled newer data from GitHub ✓');
+    } else {
+      // Local is newer or equal → push
+      await ghPutData(local, remote.sha);
+      showToast('Data pushed to GitHub ✓');
+    }
+    renderSyncBtn('synced');
+  } catch (e) {
+    renderSyncBtn('error', e.message);
+    showToast('Sync error: ' + e.message, 5000);
+  }
+}
+
+// Auto-sync triggers
+window.addEventListener('focus',  () => { if (githubSettings.autoSync && githubSettings.pat) syncData(); });
+window.addEventListener('online', () => { if (githubSettings.pat)      syncData(); });
+
+// ─── Settings Modal ───────────────────────────────────────────────────
+function openSettings() {
+  // Populate fields from current settings
+  const s = githubSettings;
+  document.getElementById('gh-pat').value      = s.pat   || '';
+  document.getElementById('gh-owner').value    = s.owner || '';
+  document.getElementById('gh-repo').value     = s.repo  || '';
+  document.getElementById('gh-path').value     = s.path  || 'trips.json';
+  document.getElementById('gh-autosync').checked = !!s.autoSync;
+  const result = document.getElementById('gh-test-result');
+  if (result) result.classList.add('hidden');
+  document.getElementById('gh-modal-bg').classList.remove('hidden');
+}
+
+function closeSettings() {
+  document.getElementById('gh-modal-bg').classList.add('hidden');
+}
+
+function saveGhSettings() {
+  githubSettings = {
+    pat:      document.getElementById('gh-pat').value.trim(),
+    owner:    document.getElementById('gh-owner').value.trim(),
+    repo:     document.getElementById('gh-repo').value.trim(),
+    path:     (document.getElementById('gh-path').value.trim()) || 'trips.json',
+    autoSync: document.getElementById('gh-autosync').checked,
+  };
+  localStorage.setItem('roadtrip-gh', JSON.stringify(githubSettings));
+  closeSettings();
+  renderSyncBtn(githubSettings.pat ? 'idle' : 'unconfigured');
+  showToast('Settings saved ✓');
+}
+
+async function testGhConnection() {
+  const result = document.getElementById('gh-test-result');
+  if (!result) return;
+  const pat   = document.getElementById('gh-pat').value.trim();
+  const owner = document.getElementById('gh-owner').value.trim();
+  const repo  = document.getElementById('gh-repo').value.trim();
+  const path  = (document.getElementById('gh-path').value.trim()) || 'trips.json';
+  if (!pat || !owner || !repo) {
+    result.textContent = '✗ Please fill in token, username and repo first.';
+    result.className   = 'gh-test-result error';
+    result.classList.remove('hidden');
+    return;
+  }
+  result.textContent = 'Testing…';
+  result.className   = 'gh-test-result';
+  result.classList.remove('hidden');
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/contents/${path}`, {
+      headers: { Authorization: `Bearer ${pat}`, Accept: 'application/vnd.github.v3+json' },
+    });
+    if (res.status === 200 || res.status === 404) {
+      result.textContent = res.status === 404
+        ? '✓ Repo found. File doesn\'t exist yet — it will be created on first sync.'
+        : '✓ Connected! trips.json found.';
+      result.className = 'gh-test-result success';
+    } else if (res.status === 401) {
+      result.textContent = '✗ Unauthorised — check your token (needs repo scope).';
+      result.className = 'gh-test-result error';
+    } else if (res.status === 403) {
+      result.textContent = '✗ Forbidden — token may lack repo scope or rate limit hit.';
+      result.className = 'gh-test-result error';
+    } else {
+      result.textContent = `✗ Unexpected response: ${res.status}`;
+      result.className = 'gh-test-result error';
+    }
+  } catch (e) {
+    result.textContent = '✗ Network error: ' + e.message;
+    result.className = 'gh-test-result error';
+  }
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────
+renderMarkerOpts();
+renderAll();
+renderBookings();
+renderTripDescBar();
+setPill();
+renderSyncBtn(githubSettings.pat ? 'idle' : 'unconfigured');
+
+</script>
+
+<!-- ─── GitHub Sync Settings Modal ──────────────────────────────────── -->
+<div class="gh-modal-bg hidden" id="gh-modal-bg" onclick="if(event.target===this)closeSettings()">
+  <div class="gh-modal" role="dialog" aria-modal="true" aria-labelledby="gh-modal-title">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 id="gh-modal-title" style="margin:0;font-size:1rem;color:#F7FFF6;font-weight:700">
+        ☁ GitHub Sync Settings
+      </h2>
+      <button class="btn-gh-close" onclick="closeSettings()" title="Close">✕</button>
+    </div>
+
+    <div class="gh-form-group">
+      <label class="gh-label" for="gh-pat">Personal Access Token (PAT)</label>
+      <input type="password" id="gh-pat" class="gh-input" placeholder="ghp_…"
+             autocomplete="off" spellcheck="false" />
+      <div class="gh-hint">Token needs <code>repo</code> scope. Never shared — stored only in your browser.</div>
+    </div>
+
+    <div class="gh-form-group">
+      <label class="gh-label" for="gh-owner">GitHub Username</label>
+      <input type="text" id="gh-owner" class="gh-input" placeholder="your-github-username"
+             autocomplete="off" spellcheck="false" />
+    </div>
+
+    <div class="gh-form-group">
+      <label class="gh-label" for="gh-repo">Private Data Repo Name</label>
+      <input type="text" id="gh-repo" class="gh-input" placeholder="road-trip-data"
+             autocomplete="off" spellcheck="false" />
+      <div class="gh-hint">A <strong>private</strong> repo where trips.json will be saved. Must already exist.</div>
+    </div>
+
+    <div class="gh-form-group">
+      <label class="gh-label" for="gh-path">File Path in Repo</label>
+      <input type="text" id="gh-path" class="gh-input" placeholder="trips.json"
+             autocomplete="off" spellcheck="false" />
+    </div>
+
+    <div class="gh-toggle-row">
+      <label class="gh-label" for="gh-autosync" style="margin:0">Auto-sync on app focus</label>
+      <input type="checkbox" id="gh-autosync" style="width:16px;height:16px;accent-color:#03B5AA;cursor:pointer" />
+    </div>
+
+    <div id="gh-test-result" class="gh-test-result hidden"></div>
+
+    <div class="gh-modal-actions">
+      <button class="btn-gh-test" onclick="testGhConnection()">Test connection</button>
+      <button class="btn-gh-save" onclick="saveGhSettings()">Save &amp; close</button>
+    </div>
+
+    <details class="gh-setup-guide">
+      <summary>▸ First-time setup guide</summary>
+      <div class="gh-setup-steps">
+        <p><strong>1. Create the app repo (public)</strong><br>
+          On github.com, click <em>New repository</em>. Name it e.g. <code>road-trip-planner</code>. Keep it <em>Public</em>. Create it.</p>
+        <p><strong>2. Upload the app files</strong><br>
+          In the new repo click <em>Add file → Create new file</em>. Paste the contents of <code>index.html</code>, <code>sw.js</code>, <code>manifest.json</code>, and <code>icon.svg</code> one by one.</p>
+        <p><strong>3. Enable GitHub Pages</strong><br>
+          Go to <em>Settings → Pages → Source: Deploy from branch → main / root → Save</em>. Your app will be live at <code>https://USERNAME.github.io/road-trip-planner/</code> within ~60 s.</p>
+        <p><strong>4. Create the private data repo</strong><br>
+          Create a second repo, e.g. <code>road-trip-data</code>. Set it to <em>Private</em>. No files needed — the app creates <code>trips.json</code> on first sync.</p>
+        <p><strong>5. Generate a Personal Access Token</strong><br>
+          Go to <em>github.com/settings/tokens → Generate new token (classic)</em>. Check the ☑ <em>repo</em> scope. Copy the token (shown only once).</p>
+        <p><strong>6. Configure sync here</strong><br>
+          Paste your token above, enter your GitHub username and the data repo name, then click <em>Save &amp; close</em>. Hit the ☁ button in the toolbar to sync.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+</body>
+</html>

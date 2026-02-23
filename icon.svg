@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background circle -->
+  <circle cx="256" cy="256" r="256" fill="#2e353b"/>
+  <!-- Road / path -->
+  <path d="M256 390 C180 310 140 260 140 210 a116 116 0 0 1 232 0 C372 260 332 310 256 390z"
+        fill="none" stroke="#03B5AA" stroke-width="22" stroke-linejoin="round"/>
+  <!-- Pin dot -->
+  <circle cx="256" cy="210" r="38" fill="#F7FFF6"/>
+  <circle cx="256" cy="210" r="22" fill="#03B5AA"/>
+</svg>
