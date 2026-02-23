@@ -34,6 +34,7 @@
       flex-direction: column;
       overflow: hidden;
     }
+    .hidden { display: none; }
 
     /* ── Header ─────────────────────────────────────────────── */
     header {
@@ -690,6 +691,10 @@
       opacity: 0;
       pointer-events: none;
     }
+    .filter-bar.collapsed .filter-bar-header {
+      padding-top: 2px;
+      padding-bottom: 2px;
+    }
     #day-filter-section { max-height: 300px; border-top: 1px solid rgba(247,255,246,.08); padding-top: 6px; }
     .day-filter-hdr {
       width: 100%; display: flex; align-items: center; gap: 5px; padding-bottom: 5px; }
@@ -1008,6 +1013,128 @@
       body.mobile-map-mode #map { display: block; height: 100dvh; flex: 1; }
     }
 
+    /* ── Nav Panel ───────────────────────────────────────────── */
+    #nav-panel {
+      width: 220px; flex-shrink: 0;
+      display: flex; flex-direction: column;
+      background: #2a3038;
+      border-right: 1px solid rgba(247,255,246,.08);
+      overflow: hidden;
+    }
+    .nav-trip-header {
+      padding: 9px 12px 8px; border-bottom: 1px solid rgba(247,255,246,.08); flex-shrink: 0;
+    }
+    .nav-trip-name {
+      font-size: .76rem; font-weight: 700; color: #F7FFF6;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block;
+    }
+    .nav-section-header {
+      display: flex; align-items: center; padding: 7px 12px 3px; gap: 6px; flex-shrink: 0;
+    }
+    .nav-section-label {
+      font-size: .61rem; font-weight: 800; letter-spacing: .08em;
+      text-transform: uppercase; color: rgba(247,255,246,.3); flex: 1;
+    }
+    .nav-section-add-btn {
+      background: none; border: 1px solid rgba(247,255,246,.2); border-radius: 50%;
+      width: 18px; height: 18px; color: rgba(247,255,246,.5); cursor: pointer;
+      font-size: 14px; line-height: 1; display: flex; align-items: center;
+      justify-content: center; padding: 0; transition: all .12s;
+    }
+    .nav-section-add-btn:hover { background: #03B5AA; border-color: #03B5AA; color: #fff; }
+    .nav-scroll-area { flex: 1; overflow-y: auto; min-height: 0; }
+    .nav-bookings-area {
+      max-height: 35%; border-top: 1px solid rgba(247,255,246,.08);
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .nav-bookings-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+    /* Day items */
+    .nav-day-item { border-left: 2px solid transparent; }
+    .nav-day-item.active { border-left-color: #03B5AA; }
+    .nav-day-header-row {
+      display: flex; align-items: center; gap: 5px;
+      padding: 5px 10px; cursor: pointer; transition: background .1s;
+    }
+    .nav-day-header-row:hover { background: rgba(247,255,246,.05); }
+    .nav-day-item.active .nav-day-header-row { background: rgba(3,181,170,.1); }
+    .nav-day-chevron { flex-shrink: 0; color: rgba(247,255,246,.3); transition: transform .15s; }
+    .nav-day-chevron.open { transform: rotate(90deg); }
+    .nav-day-label { font-size: .73rem; font-weight: 700; color: #F7FFF6; }
+    .nav-day-date { font-size: .62rem; color: rgba(247,255,246,.4); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nav-day-count { font-size: .61rem; color: rgba(247,255,246,.3); background: rgba(247,255,246,.08); padding: 1px 5px; border-radius: 8px; flex-shrink: 0; }
+    /* Stop items in nav */
+    .nav-stop-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 3px 10px 3px 22px; cursor: pointer; transition: background .1s;
+    }
+    .nav-stop-item:hover { background: rgba(247,255,246,.05); }
+    .nav-stop-icon { flex-shrink: 0; display: flex; align-items: center; width: 14px; }
+    .nav-stop-name { font-size: .69rem; color: rgba(247,255,246,.7); flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nav-stop-time { font-size: .61rem; color: rgba(247,255,246,.3); flex-shrink: 0; }
+    .nav-booking-inline { background: rgba(0,0,0,.12); }
+    .nav-booking-inline .nav-stop-name { color: rgba(247,255,246,.55); }
+    .nav-stop-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .nav-stop-days { font-size: .61rem; flex-shrink: 0; }
+    /* Booking items in nav */
+    .nav-booking-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 5px 12px; cursor: pointer; transition: background .1s;
+    }
+    .nav-booking-item:hover { background: rgba(247,255,246,.05); }
+    .nav-booking-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .nav-booking-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .nav-booking-name { font-size: .70rem; color: rgba(247,255,246,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .nav-booking-meta { font-size: .61rem; color: rgba(247,255,246,.35); }
+    .nav-empty { padding: 6px 12px; font-size: .69rem; color: rgba(247,255,246,.25); font-style: italic; }
+
+    /* ── Day nav header (replaces tabs bar in middle panel) ────── */
+    #day-nav-header {
+      display: flex; align-items: center; gap: 6px;
+      padding: 7px 12px; border-bottom: 1px solid rgba(247,255,246,.1);
+      flex-shrink: 0; background: #3c454d; min-height: 38px;
+    }
+    .day-nav-btn {
+      background: none; border: none; color: rgba(247,255,246,.5); cursor: pointer;
+      padding: 4px; border-radius: 4px; display: flex; align-items: center;
+      transition: color .12s, background .12s;
+    }
+    .day-nav-btn:hover:not(:disabled) { color: #F7FFF6; background: rgba(247,255,246,.08); }
+    .day-nav-btn:disabled { opacity: .3; cursor: default; }
+    .day-nav-title { flex: 1; display: flex; align-items: center; gap: 7px; }
+    .day-nav-label { font-size: .78rem; font-weight: 800; color: #F7FFF6; letter-spacing: .03em; }
+    .day-nav-date  { font-size: .69rem; color: rgba(247,255,246,.4); }
+    .btn-add-stop-day {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(3,181,170,.15); border: 1px solid rgba(3,181,170,.3);
+      color: #03B5AA; font-family: inherit; font-size: .71rem; font-weight: 700;
+      padding: 4px 9px; border-radius: 14px; cursor: pointer; transition: background .12s;
+    }
+    .btn-add-stop-day:hover { background: rgba(3,181,170,.25); }
+
+    /* ── Day bookings banner (single-day itinerary view) ─────── */
+    .day-bookings-banner { margin: 0 0 6px; }
+    .day-bookings-banner-label {
+      font-size: .61rem; font-weight: 800; letter-spacing: .08em;
+      color: rgba(247,255,246,.3); padding: 0 2px 4px; text-transform: uppercase;
+    }
+    .day-booking-card {
+      background: #3c454d; border-radius: 8px; padding: 7px 10px; margin-bottom: 5px;
+      cursor: pointer; transition: border-color .12s; border: 1px solid rgba(247,255,246,.08);
+    }
+    .day-booking-card:hover { border-color: rgba(247,255,246,.2); }
+    .day-booking-top { display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+    .day-booking-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .day-booking-name { font-size: .74rem; font-weight: 700; color: #F7FFF6; }
+    .day-booking-meta {
+      display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
+      font-size: .67rem; color: rgba(247,255,246,.4); padding-left: 15px;
+    }
+
+    /* ── Desktop: hide tabs bar; hide booking list (moved to nav) */
+    .tabs { display: none; }
+    #panel-bookings #bookings-list { display: none; }
+    .sidebar { width: 350px; }
+
     /* ── Responsive ──────────────────────────────────────────── */
     @media (max-width: 680px) {
       body { overflow: auto; }
@@ -1016,6 +1143,10 @@
       .sidebar.collapsed { width: 100% !important; height: 0; max-height: 0; }
       .sidebar-handle { display: none; }
       #map { display: none; }
+      #nav-panel { display: none; }
+      .tabs { display: flex; }
+      #day-nav-header { display: none; }
+      #panel-bookings #bookings-list { display: block; }
     }
   </style>
 </head>
@@ -1058,6 +1189,25 @@
 </header>
 
 <div class="app">
+
+  <!-- ── Nav Panel ────────────────────────────────────────────── -->
+  <div id="nav-panel">
+    <div class="nav-trip-header">
+      <span id="nav-trip-name" class="nav-trip-name"></span>
+    </div>
+    <div class="nav-section-header">
+      <span class="nav-section-label">Days</span>
+      <button class="nav-section-add-btn" onclick="openAddForDay(0)" title="Add stop">+</button>
+    </div>
+    <div id="days-nav" class="nav-scroll-area"></div>
+    <div class="nav-bookings-area">
+      <div class="nav-section-header">
+        <span class="nav-section-label">Bookings</span>
+        <button class="nav-section-add-btn" onclick="openNewBookingForm()" title="Add booking">+</button>
+      </div>
+      <div id="bookings-nav" class="nav-bookings-scroll"></div>
+    </div>
+  </div>
 
   <!-- ── Sidebar ─────────────────────────────────────────────── -->
   <div class="sidebar">
@@ -1148,7 +1298,7 @@
     </div>
 
     <!-- Filter bar -->
-    <div class="filter-bar" id="filter-bar">
+    <div class="filter-bar collapsed" id="filter-bar">
       <div class="filter-bar-header">
         <span class="filter-bar-label">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -1176,14 +1326,16 @@
       </div>
     </div>
 
+    <div id="day-nav-header"></div>
+
     <div class="tabs">
-      <button class="tab-btn active" id="tab-add"      onclick="showTab('add')">＋ Add Stop</button>
-      <button class="tab-btn"        id="tab-list"     onclick="showTab('list')">Itinerary</button>
+      <button class="tab-btn"        id="tab-add"      onclick="showTab('add')">＋ Add Stop</button>
+      <button class="tab-btn active" id="tab-list"     onclick="showTab('list')">Itinerary</button>
       <button class="tab-btn"        id="tab-bookings" onclick="showTab('bookings')">📋 Bookings</button>
     </div>
 
     <!-- Add Stop Form -->
-    <div class="form-panel" id="panel-add">
+    <div class="form-panel hidden" id="panel-add">
 
       <div class="form-row">
         <div class="form-group" style="flex:0 0 90px">
@@ -1256,7 +1408,7 @@
     </div>
 
     <!-- Itinerary List -->
-    <div class="list-panel" id="panel-list">
+    <div class="list-panel active" id="panel-list">
       <div class="view-toggle-bar">
         <span>View</span>
         <button class="btn-view-toggle active" id="btn-view-list"
@@ -1966,6 +2118,7 @@ function cancelEdit() {
   document.getElementById('inp-booking-ref').value = '';
   renderBookingRefSelect();
   clearStatus();
+  showTab('list');
 }
 
 // ─── Move stop up / down ─────────────────────────────────────────────
@@ -2619,6 +2772,39 @@ function renderList() {
   });
 
   container.innerHTML = '';
+
+  // ── Day bookings banner (single-day view) ───────────────────
+  if (activeDayFilter.size === 1) {
+    const fd = [...activeDayFilter][0];
+    const dayBks = spanItems.filter(si => (si.startDay || 1) <= fd && (si.endDay || si.startDay || 1) >= fd);
+    if (dayBks.length) {
+      const banner = document.createElement('div');
+      banner.className = 'day-bookings-banner';
+      banner.innerHTML = '<div class="day-bookings-banner-label">Bookings</div>' +
+        dayBks.map(si => {
+          const color   = SPAN_TYPES[si.type]?.color || '#94A3B8';
+          const label   = SPAN_TYPES[si.type]?.label || 'Booking';
+          const daysStr = si.startDay === si.endDay ? `Day ${si.startDay}` : `Days ${si.startDay}–${si.endDay}`;
+          const times   = [si.checkIn, si.checkOut].filter(Boolean).join(' – ');
+          const costStr = si.cost != null ? `<span class="span-cost-badge">${si.currency ? si.currency + '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>` : '';
+          return `<div class="day-booking-card" onclick="editBooking(${si.id})">
+            <div class="day-booking-top">
+              <span class="day-booking-dot" style="background:${color}"></span>
+              <span class="day-booking-name">${esc(si.name)}</span>
+            </div>
+            <div class="day-booking-meta">
+              <span style="background:${color}22;color:${color};padding:1px 6px;border-radius:10px;font-size:.65rem;font-weight:700">${label}</span>
+              <span>${daysStr}</span>
+              ${times ? `<span>🕐 ${times}</span>` : ''}
+              ${costStr}
+            </div>
+            ${si.notes ? `<div class="md-content" style="font-size:.71rem;margin-top:4px;opacity:.75">${renderMarkdown(si.notes)}</div>` : ''}
+          </div>`;
+        }).join('');
+      container.appendChild(banner);
+    }
+  }
+
   Object.keys(byDay).map(Number).sort((a,b) => a-b)
     .filter(d => activeDayFilter.size === 0 || activeDayFilter.has(d))
     .forEach(day => {
@@ -3085,6 +3271,7 @@ function setAllTypesVisible(all) {
 
 function toggleFilterBar() {
   filterBarOpen = !filterBarOpen;
+  document.getElementById('filter-bar').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('filter-chips').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('day-filter-section').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('btn-filter-chevron').classList.toggle('open', filterBarOpen);
@@ -3392,9 +3579,8 @@ async function addBooking() {
 
   clearBookingForm();
   save();
-  renderBookings();
-  updateMap();
-  renderList();
+  renderAll();
+  showTab('list');
 }
 
 function editBooking(id) {
@@ -3423,6 +3609,7 @@ function cancelBookingEdit() {
   document.getElementById('btn-booking-add').textContent      = '+ Add Booking';
   document.getElementById('btn-booking-cancel').style.display = 'none';
   clearBookingForm();
+  showTab('list');
 }
 
 function deleteBooking(id) {
@@ -3508,8 +3695,169 @@ function renderBookings() {
   renderBookingRefSelect();
 }
 
+// ─── Nav Panel ───────────────────────────────────────────────────────
+function renderNavPanel() {
+  const trip = trips.find(t => t.id === activeId);
+  const nameEl = document.getElementById('nav-trip-name');
+  if (nameEl) nameEl.textContent = trip?.name || 'My Trip';
+  renderDaysNav();
+  renderBookingsNav();
+}
+
+function renderDaysNav() {
+  const el = document.getElementById('days-nav');
+  if (!el) return;
+
+  // Collect all day numbers from stops and spanItems
+  const daySet = new Set(stops.map(s => s.day || 0));
+  spanItems.forEach(si => {
+    for (let d = (si.startDay || 1); d <= (si.endDay || si.startDay || 1); d++) daySet.add(d);
+  });
+  const days = [...daySet].filter(d => d > 0).sort((a, b) => a - b);
+  const hasUnassigned = daySet.has(0);
+
+  if (days.length === 0 && !hasUnassigned) {
+    el.innerHTML = '<div class="nav-empty">No stops yet.</div>';
+    return;
+  }
+
+  const allActive = activeDayFilter.size === 0;
+  let html = `<div class="nav-day-item${allActive ? ' active' : ''}">
+    <div class="nav-day-header-row" onclick="selectNavDay(0)">
+      <svg class="nav-day-chevron${allActive ? ' open' : ''}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+      <span class="nav-day-label">All days</span>
+      <span class="nav-day-count">${stops.length}</span>
+    </div>
+  </div>`;
+
+  // Per-day items
+  const allDays = hasUnassigned ? [0, ...days] : days;
+  allDays.forEach(d => {
+    if (d === 0 && !hasUnassigned) return;
+    const dayStops    = stops.filter(s => (s.day || 0) === d);
+    const isActive    = activeDayFilter.has(d);
+    const showItems   = isActive;
+    const dateStr     = d > 0 ? formatDayDate(d) : null;
+    const label       = d === 0 ? 'Unassigned' : `Day ${d}`;
+    const inlineBks   = spanItems.filter(si => si.startDay === d); // bookings starting this day
+
+    html += `<div class="nav-day-item${isActive ? ' active' : ''}" data-day="${d}">
+      <div class="nav-day-header-row" onclick="selectNavDay(${d})">
+        <svg class="nav-day-chevron${isActive ? ' open' : ''}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+        <span class="nav-day-label">${label}</span>
+        ${dateStr ? `<span class="nav-day-date">${dateStr}</span>` : ''}
+        <span class="nav-day-count">${dayStops.length + inlineBks.length}</span>
+      </div>`;
+
+    if (showItems) {
+      // Individual stops
+      dayStops.forEach(s => {
+        const t = TYPES[s.type] || TYPES.other;
+        html += `<div class="nav-stop-item" onclick="focusStop(${s.id})" title="${esc(s.name)}">
+          <span class="nav-stop-icon" style="color:${t.color}">${iconHtml(s.type, {size: 12})}</span>
+          <span class="nav-stop-name">${esc(s.name)}</span>
+          ${s.startTime ? `<span class="nav-stop-time">${s.startTime}</span>` : ''}
+        </div>`;
+      });
+      // Bookings starting on this day
+      inlineBks.forEach(si => {
+        const color = SPAN_TYPES[si.type]?.color || '#94A3B8';
+        const daysStr = si.endDay !== si.startDay ? `D${si.startDay}–${si.endDay}` : `D${si.startDay}`;
+        html += `<div class="nav-stop-item nav-booking-inline" onclick="editBooking(${si.id})" title="${esc(si.name)}">
+          <span class="nav-stop-icon"><span class="nav-stop-dot" style="background:${color}"></span></span>
+          <span class="nav-stop-name">${esc(si.name)}</span>
+          <span class="nav-stop-days" style="color:${color}">${daysStr}</span>
+        </div>`;
+      });
+    }
+    html += '</div>';
+  });
+
+  el.innerHTML = html;
+}
+
+function renderBookingsNav() {
+  const el = document.getElementById('bookings-nav');
+  if (!el) return;
+  if (!spanItems.length) {
+    el.innerHTML = '<div class="nav-empty">No bookings yet.</div>';
+    return;
+  }
+  const sorted = [...spanItems].sort((a, b) => (a.startDay || 0) - (b.startDay || 0));
+  el.innerHTML = sorted.map(si => {
+    const color   = SPAN_TYPES[si.type]?.color || '#94A3B8';
+    const daysStr = si.startDay === si.endDay ? `D${si.startDay}` : `D${si.startDay}–${si.endDay}`;
+    const costStr = si.cost != null ? ` · ${si.currency || ''}${si.currency ? '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '';
+    return `<div class="nav-booking-item" onclick="editBooking(${si.id})">
+      <span class="nav-booking-dot" style="background:${color}"></span>
+      <div class="nav-booking-info">
+        <span class="nav-booking-name">${esc(si.name)}</span>
+        <span class="nav-booking-meta">${daysStr}${costStr}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderDayNavHeader() {
+  const el = document.getElementById('day-nav-header');
+  if (!el) return;
+
+  const maxDay = Math.max(
+    stops.reduce((m, s) => Math.max(m, s.day || 0), 0),
+    spanItems.reduce((m, si) => Math.max(m, si.endDay || 0), 0)
+  );
+
+  const prevArrow = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>`;
+  const nextArrow = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>`;
+  const plusIcon  = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>`;
+
+  if (activeDayFilter.size === 1) {
+    const d       = [...activeDayFilter][0];
+    const dateStr = formatDayDate(d);
+    const prevDay = d > 1 ? d - 1 : 0;
+    const nextDay = d < maxDay ? d + 1 : 0;
+    el.innerHTML = `
+      <button class="day-nav-btn" onclick="selectNavDay(${prevDay})" title="${prevDay ? 'Day ' + prevDay : 'All days'}" ${d <= 1 ? 'disabled' : ''}>${prevArrow}</button>
+      <div class="day-nav-title">
+        <span class="day-nav-label">Day ${d}</span>
+        ${dateStr ? `<span class="day-nav-date">${dateStr}</span>` : ''}
+      </div>
+      <button class="day-nav-btn" onclick="selectNavDay(${nextDay})" title="${nextDay ? 'Day ' + nextDay : 'All days'}" ${d >= maxDay ? 'disabled' : ''}>${nextArrow}</button>
+      <button class="btn-add-stop-day" onclick="openAddForDay(${d})" title="Add stop for Day ${d}">${plusIcon} Add</button>`;
+  } else {
+    el.innerHTML = `
+      <div class="day-nav-title">
+        <span class="day-nav-label">All days</span>
+        ${maxDay > 0 ? `<span class="day-nav-date">${maxDay} day${maxDay !== 1 ? 's' : ''}</span>` : ''}
+      </div>
+      <button class="btn-add-stop-day" onclick="showTab('add')" title="Add stop">${plusIcon} Add</button>`;
+  }
+}
+
+function selectNavDay(dayNum) {
+  activeDayFilter.clear();
+  if (dayNum > 0) activeDayFilter.add(dayNum);
+  showTab('list');
+  renderNavPanel();
+  renderDayNavHeader();
+  renderList();
+  updateMap();
+  fitMapToTrip();
+}
+
+function openAddForDay(day) {
+  clearStopForm();
+  if (day > 0) document.getElementById('inp-day').value = day;
+  showTab('add');
+}
+
+function openNewBookingForm() {
+  clearBookingForm();
+  showTab('bookings');
+}
+
 // ─── Render both ─────────────────────────────────────────────────────
-function renderAll() { renderTripBar(); renderFilterBar(); renderList(); updateMap(); renderBookings(); renderTripDescBar(); }
+function renderAll() { renderTripBar(); renderFilterBar(); renderNavPanel(); renderDayNavHeader(); renderList(); updateMap(); renderBookings(); renderTripDescBar(); }
 
 // ─── Close marker-opts panel on outside click ─────────────────────────
 document.addEventListener('click', () => {
