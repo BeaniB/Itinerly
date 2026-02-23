@@ -815,20 +815,6 @@
       letter-spacing: .07em; color: rgba(247,255,246,.35);
       padding-bottom: 8px; padding-top: 4px;
     }
-    .inroute-row {
-      display: flex; align-items: center; gap: 8px;
-      margin-bottom: 11px; padding: 8px 11px;
-      background: rgba(3,181,170,.08);
-      border-radius: 7px; border: 1px solid rgba(3,181,170,.22);
-    }
-    .inroute-row label {
-      font-size: .78rem; font-weight: 600; color: rgba(247,255,246,.8);
-      text-transform: none; letter-spacing: 0; margin: 0; cursor: pointer; flex: 1;
-    }
-    .inroute-row input[type="checkbox"] {
-      width: 16px; height: 16px; cursor: pointer;
-      accent-color: #03B5AA; flex-shrink: 0;
-    }
 
     /* ── Span item list cards ─────────────────────────────────── */
     .span-item {
@@ -851,13 +837,6 @@
       font-size: .7rem; color: rgba(247,255,246,.45);
     }
     .span-item-actions { display: flex; gap: 4px; flex-shrink: 0; }
-    .span-inroute-badge {
-      display: inline-flex; align-items: center; gap: 3px;
-      font-size: .65rem; font-weight: 700;
-      background: rgba(3,181,170,.18); color: #03B5AA;
-      border-radius: 20px; padding: 1px 7px;
-    }
-
     /* ── Span chips (timeline + list view) ───────────────────── */
     .tl-span-row {
       display: flex; flex-wrap: wrap; gap: 5px;
@@ -878,6 +857,15 @@
       100% { background: transparent;           box-shadow: none; }
     }
     .span-item--highlight { animation: bk-flash .5s ease-out 2; }
+    .span-cost-badge { background: rgba(3,181,170,.12); color: #03B5AA;
+                       padding: 1px 7px; border-radius: 20px;
+                       font-size: .68rem; font-weight: 700; white-space: nowrap; }
+    .bk-cost-summary { display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+                       padding: 8px 4px 2px; border-top: 1px solid rgba(247,255,246,.08);
+                       margin-top: 4px; }
+    .bk-cost-summary-label  { font-size: .7rem; font-weight: 700;
+                               color: rgba(247,255,246,.35); flex: 1; }
+    .bk-cost-summary-amount { font-size: .78rem; font-weight: 700; color: #03B5AA; }
 
     /* ── Booking reference badge on stop cards ────────────────── */
     .booking-ref-badge {
@@ -1003,14 +991,31 @@
     .gh-toggle-row label { font-size: .75rem; color: rgba(247,255,246,.6);
                            font-weight: 600; cursor: pointer; }
 
+    /* ── Mobile view-toggle FAB ──────────────────────────────── */
+    #btn-mobile-view { display: none; }
+    @media (max-width: 680px) {
+      #btn-mobile-view {
+        display: flex; align-items: center; gap: 6px;
+        position: fixed; bottom: 20px; right: 16px; z-index: 1001;
+        background: #03B5AA; color: #fff;
+        border: none; border-radius: 22px; padding: 10px 16px;
+        font-family: inherit; font-size: .82rem; font-weight: 700;
+        box-shadow: 0 3px 14px rgba(0,0,0,.4);
+        cursor: pointer; transition: background .15s;
+      }
+      #btn-mobile-view:active { background: #029e94; }
+      body.mobile-map-mode .app { overflow: hidden; }
+      body.mobile-map-mode #map { display: block; height: 100dvh; flex: 1; }
+    }
+
     /* ── Responsive ──────────────────────────────────────────── */
     @media (max-width: 680px) {
       body { overflow: auto; }
       .app { flex-direction: column; overflow: visible; }
-      .sidebar { width: 100% !important; height: auto; max-height: 58vh; transition: none; }
+      .sidebar { width: 100% !important; height: auto; max-height: none; transition: none; }
       .sidebar.collapsed { width: 100% !important; height: 0; max-height: 0; }
       .sidebar-handle { display: none; }
-      #map { height: 45vh; flex: none; }
+      #map { display: none; }
     }
   </style>
 </head>
@@ -1081,6 +1086,17 @@
           <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
         </svg>
       </button>
+      <!-- Fit map to trip stops -->
+      <button class="btn-trip" id="btn-fit-map" title="Zoom map to trip" onclick="fitMapToTrip()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7V5a2 2 0 0 1 2-2h2"/>
+          <path d="M17 3h2a2 2 0 0 1 2 2v2"/>
+          <path d="M21 17v2a2 2 0 0 1-2 2h-2"/>
+          <path d="M7 21H5a2 2 0 0 1-2-2v-2"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
       <!-- GitHub sync button (state updated by renderSyncBtn) -->
       <button class="btn-trip" id="btn-sync" title="Sync with GitHub" onclick="syncData()"
               style="flex-direction:column;gap:0;height:34px">
@@ -1144,7 +1160,7 @@
         <div class="filter-bar-actions">
           <button class="btn-filter-ctrl" onclick="setAllTypesVisible(true)"  title="Show all types">All</button>
           <button class="btn-filter-ctrl" onclick="setAllTypesVisible(false)" title="Hide all types">None</button>
-          <button class="btn-filter-chevron open" id="btn-filter-chevron" onclick="toggleFilterBar()" title="Collapse filter">
+          <button class="btn-filter-chevron" id="btn-filter-chevron" onclick="toggleFilterBar()" title="Expand filter">
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="18 15 12 9 6 15"/>
@@ -1152,7 +1168,7 @@
           </button>
         </div>
       </div>
-      <div class="filter-chips" id="filter-chips">
+      <div class="filter-chips collapsed" id="filter-chips">
         <!-- populated by renderFilterBar() -->
       </div>
       <div class="filter-chips" id="day-filter-section" style="display:none">
@@ -1318,15 +1334,22 @@
       </div>
 
       <div class="form-group">
+        <label for="bk-cost">Cost</label>
+        <div style="display:flex;gap:6px;align-items:center">
+          <input type="number" id="bk-cost" min="0" step="0.01"
+                 placeholder="0.00" style="flex:1;min-width:0" />
+          <input type="text" id="bk-currency" maxlength="5" value="EUR"
+                 placeholder="EUR" style="width:58px;text-transform:uppercase"
+                 oninput="this.value=this.value.toUpperCase()" />
+        </div>
+        <div class="field-hint">Amount · Currency code (USD, EUR, AUD…)</div>
+      </div>
+
+      <div class="form-group">
         <label for="bk-maps">Location (Google Maps URL)</label>
         <input type="url" id="bk-maps"
                placeholder="Paste a Google Maps URL or lat,lng" autocomplete="off" />
-        <div class="field-hint">Optional — enables map pin and route inclusion.</div>
-      </div>
-
-      <div class="inroute-row">
-        <input type="checkbox" id="bk-inroute" />
-        <label for="bk-inroute">Include in driving route (requires location)</label>
+        <div class="field-hint">Optional — enables map pin.</div>
       </div>
 
       <div class="form-group">
@@ -1448,7 +1471,7 @@ let githubSettings    = { pat:'', owner:'', repo:'', path:'trips.json', autoSync
 let lastSyncTime      = null;                       // Date of last successful GitHub sync
 let visibleTypes    = new Set(Object.keys(TYPES));  // types currently shown on map
 let activeDayFilter = new Set();                    // selected days; empty = all shown
-let filterBarOpen = true;                           // filter chip panel open/closed
+let filterBarOpen = false;                          // filter chip panel open/closed
 let timelineView      = false;                       // itinerary timeline vs card list
 let tlFetchInProgress = false;                       // guard: prevent concurrent fetchTimelineDriving()
 let drivingMode   = false;                          // driving route mode (OSRM)
@@ -2024,7 +2047,7 @@ function routeOrderWithSpans() {
   const base = routeOrder();
   const virtuals = [];
   spanItems.forEach(si => {
-    if (!si.inRoute || !si.lat) return;
+    return; // bookings are no longer included in the driving route
     const s = si.startDay || 1, e = si.endDay || s;
     for (let d = s; d <= e; d++) {
       virtuals.push({
@@ -2754,6 +2777,16 @@ function renderList() {
   // Note: distance stats are updated by updateMap() (handles both straight-line and driving mode)
 }
 
+// ─── Fit map to current trip's stops ─────────────────────────────────
+function fitMapToTrip() {
+  const coords = [];
+  stops.forEach(s => { if (s.lat && s.lng) coords.push([s.lat, s.lng]); });
+  spanItems.forEach(si => { if (si.lat && si.lng) coords.push([si.lat, si.lng]); });
+  if (coords.length === 0) return;
+  if (coords.length === 1) map.setView(coords[0], 13);
+  else map.fitBounds(L.latLngBounds(coords), { padding: [50, 50] });
+}
+
 // ─── Update map ──────────────────────────────────────────────────────
 async function updateMap() {
   const myVersion = ++mapVersion;
@@ -2798,6 +2831,7 @@ async function updateMap() {
         <span style="color:#aaa;font-size:11px">${days}</span>
       </div>
       ${times ? `<div style="font-size:11px;color:#888;margin-top:4px">${times}</div>` : ''}
+      ${si.cost != null ? `<div style="font-size:11px;color:#03B5AA;margin-top:4px;font-weight:600">💰 ${si.currency ? si.currency + '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>` : ''}
       ${si.notes ? `<div class="md-content" style="font-size:11px;color:#555;margin-top:4px">${renderMarkdown(si.notes)}</div>` : ''}
       ${si.mapsUrl ? `<a href="${esc(si.mapsUrl)}" target="_blank" rel="noopener"
         style="display:block;margin-top:6px;font-size:11px;color:#03B5AA;text-decoration:none">
@@ -2873,9 +2907,9 @@ async function updateMap() {
     coords.push([s.lat, s.lng]);
   });
 
-  // ── Span items with location but NOT in route → still show marker ──────
+  // ── Span items with location → show marker ──────────────────────────────
   spanItems.forEach(si => {
-    if (!si.lat || si.inRoute) return;
+    if (!si.lat) return;
     const mapKey = `span_${si.id}`;
     if (markerMap[mapKey]) return;
     const inDay = activeDayFilter.size === 0 ||
@@ -3134,6 +3168,34 @@ function toggleSidebar() {
   setTimeout(() => map && map.invalidateSize(), 300);
 }
 
+// ─── Mobile map / planning view toggle ────────────────────────────────
+const _MAP_ICON  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+  <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+</svg>`;
+const _LIST_ICON = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+  <line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/>
+  <line x1="8" y1="18" x2="21" y2="18"/>
+  <line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/>
+  <line x1="3" y1="18" x2="3.01" y2="18"/>
+</svg>`;
+
+function toggleMobileView() {
+  sidebarCollapsed = !sidebarCollapsed;
+  document.querySelector('.sidebar').classList.toggle('collapsed', sidebarCollapsed);
+  document.body.classList.toggle('mobile-map-mode', sidebarCollapsed);
+  const btn = document.getElementById('btn-mobile-view');
+  if (btn) btn.innerHTML = sidebarCollapsed
+    ? _LIST_ICON + ' Plan'
+    : _MAP_ICON  + ' Map';
+  setTimeout(() => {
+    map && map.invalidateSize();
+    if (sidebarCollapsed) fitMapToTrip();
+  }, 50);
+}
+
 // ─── Marker display options ───────────────────────────────────────────
 function toggleMarkerOptsPanel(e) {
   e.stopPropagation();
@@ -3219,6 +3281,7 @@ function switchTrip(id) {
   if (editingId !== null) cancelEdit();            // exit edit mode on trip switch
   renderTripBar();
   renderAll();
+  fitMapToTrip();
 }
 
 function createTrip() {
@@ -3267,8 +3330,9 @@ function clearBookingForm() {
   document.getElementById('bk-end-day').value   = 1;
   document.getElementById('bk-checkin').value   = '';
   document.getElementById('bk-checkout').value  = '';
+  document.getElementById('bk-cost').value      = '';
+  document.getElementById('bk-currency').value  = 'EUR';
   document.getElementById('bk-maps').value      = '';
-  document.getElementById('bk-inroute').checked = false;
   document.getElementById('bk-notes').value     = '';
   clearBkStatus();
 }
@@ -3281,8 +3345,9 @@ async function addBooking() {
   const checkIn  = document.getElementById('bk-checkin').value;
   const checkOut = document.getElementById('bk-checkout').value;
   const mapsUrl  = document.getElementById('bk-maps').value.trim();
-  const inRoute  = document.getElementById('bk-inroute').checked;
   const notes    = document.getElementById('bk-notes').value.trim();
+  const cost     = parseFloat(document.getElementById('bk-cost').value) || null;
+  const currency = document.getElementById('bk-currency').value.trim().toUpperCase() || '';
   const btn      = document.getElementById('btn-booking-add');
 
   if (!name) { document.getElementById('bk-name').focus(); return; }
@@ -3313,7 +3378,7 @@ async function addBooking() {
   }
 
   const item = { name, type, startDay, endDay, checkIn, checkOut,
-                 mapsUrl, lat, lng, inRoute: inRoute && lat !== null, notes };
+                 mapsUrl, lat, lng, notes, cost, currency };
 
   if (editingSpanId !== null) {
     const idx = spanItems.findIndex(s => s.id === editingSpanId);
@@ -3341,8 +3406,9 @@ function editBooking(id) {
   document.getElementById('bk-end-day').value   = si.endDay    || si.startDay || 1;
   document.getElementById('bk-checkin').value   = si.checkIn   || '';
   document.getElementById('bk-checkout').value  = si.checkOut  || '';
+  document.getElementById('bk-cost').value      = si.cost     ?? '';
+  document.getElementById('bk-currency').value  = si.currency || '';
   document.getElementById('bk-maps').value      = si.mapsUrl   || '';
-  document.getElementById('bk-inroute').checked = si.inRoute   || false;
   document.getElementById('bk-notes').value     = si.notes     || '';
   editingSpanId = id;
   document.getElementById('btn-booking-add').textContent      = '✓ Save Booking';
@@ -3414,11 +3480,29 @@ function renderBookings() {
         <span>${days}</span>
         ${times  ? `<span>🕐 ${times}</span>` : ''}
         ${si.lat ? `<span style="color:rgba(247,255,246,.3)">📍</span>` : ''}
-        ${si.inRoute ? '<span class="span-inroute-badge">🔀 In route</span>' : ''}
+        ${si.cost != null ? `<span class="span-cost-badge">${si.currency ? si.currency + '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>` : ''}
       </div>
       ${si.notes ? `<div class="md-content" style="font-size:.7rem;color:rgba(247,255,246,.38);margin-top:1px">${renderMarkdown(si.notes)}</div>` : ''}`;
     listEl.appendChild(div);
   });
+
+  // Cost summary row (totals grouped by currency)
+  const totals = {};
+  spanItems.forEach(si => {
+    if (si.cost == null) return;
+    const cur = si.currency || '—';
+    totals[cur] = (totals[cur] || 0) + si.cost;
+  });
+  const totalKeys = Object.keys(totals);
+  if (totalKeys.length) {
+    const summaryEl = document.createElement('div');
+    summaryEl.className = 'bk-cost-summary';
+    summaryEl.innerHTML = '<span class="bk-cost-summary-label">Total</span>' +
+      totalKeys.map(c =>
+        `<span class="bk-cost-summary-amount">${c !== '—' ? c + '\u202F' : ''}${totals[c].toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>`
+      ).join('');
+    listEl.appendChild(summaryEl);
+  }
 
   // Keep the booking-ref dropdown in the stop form in sync
   renderBookingRefSelect();
@@ -3736,6 +3820,16 @@ setPill();
 renderSyncBtn(githubSettings.pat ? 'idle' : 'unconfigured');
 
 </script>
+
+<!-- ─── Mobile view-toggle FAB ───────────────────────────────────────── -->
+<button id="btn-mobile-view" onclick="toggleMobileView()" title="Show map">
+  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+       stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+    <polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/>
+    <line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/>
+  </svg>
+  Map
+</button>
 
 <!-- ─── GitHub Sync Settings Modal ──────────────────────────────────── -->
 <div class="gh-modal-bg hidden" id="gh-modal-bg" onclick="if(event.target===this)closeSettings()">
