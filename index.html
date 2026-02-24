@@ -12,6 +12,8 @@
   <meta name="apple-mobile-web-app-title" content="Trip Planner" />
   <link rel="apple-touch-icon" href="./icon.svg" />
   <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <!-- Optional local config (gitignored). Copy config.example.js → config.js and fill in your keys. -->
+  <script src="config.js" onerror="void 0"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     /*
@@ -92,7 +94,7 @@
 
     /* ── Sidebar ─────────────────────────────────────────────── */
     .sidebar {
-      width: 390px;
+      width: var(--sidebar-w, 390px);
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -101,30 +103,51 @@
       overflow: hidden;
       transition: width .28s ease;
     }
-    .sidebar.collapsed { width: 0; border-right: none; }
+    .sidebar.collapsed { --sidebar-w: 0px; border-right: none; }
 
-    /* ── Sidebar collapse handle ──────────────────────────────── */
+    /* ── Sidebar resize/collapse handle ──────────────────────────────── */
     .sidebar-handle {
       width: 14px;
       flex-shrink: 0;
       background: #363e46;
       border-right: 1px solid rgba(247,255,246,.07);
       display: flex;
+      flex-direction: column;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
+      gap: 3px;
+      cursor: col-resize;
       z-index: 100;
       transition: background .15s, width .15s;
       position: relative;
+      user-select: none;
     }
-    .sidebar-handle:hover { background: #454f5a; width: 18px; }
+    .sidebar-handle:hover { background: #454f5a; width: 16px; }
+    /* Grip dots */
+    .sidebar-handle::before,
+    .sidebar-handle::after {
+      content: '';
+      display: block;
+      width: 3px; height: 3px;
+      border-radius: 50%;
+      background: rgba(247,255,246,.3);
+      box-shadow: 0 6px 0 rgba(247,255,246,.3), 0 -6px 0 rgba(247,255,246,.3);
+      transition: background .15s;
+    }
+    .sidebar-handle:hover::before,
+    .sidebar-handle:hover::after { background: rgba(247,255,246,.65); }
+    /* Collapse arrow (hidden until hovered) */
     .sidebar-handle svg {
-      color: rgba(247,255,246,.35);
+      color: rgba(247,255,246,.0);
       transition: color .15s, transform .28s ease;
       flex-shrink: 0;
+      position: absolute;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
     }
-    .sidebar-handle:hover svg { color: rgba(247,255,246,.75); }
-    .sidebar.collapsed + .sidebar-handle svg { transform: rotate(180deg); }
+    .sidebar-handle:hover svg { color: rgba(247,255,246,.6); }
+    .sidebar-handle:hover::before,
+    .sidebar-handle:hover::after { opacity: 0; }
+    .sidebar.collapsed + .sidebar-handle svg { transform: translate(-50%, -50%) rotate(180deg); }
 
     /* ── Tabs ────────────────────────────────────────────────── */
     .tabs { display: flex; border-bottom: 1px solid rgba(247,255,246,.1); flex-shrink: 0; }
@@ -275,7 +298,7 @@
     .btn-add:disabled { background: rgba(247,255,246,.1); color: rgba(247,255,246,.3); cursor: not-allowed; }
 
     .btn-cancel-edit {
-      display: none;
+      display: block;
       width: 100%;
       padding: 7px;
       margin-top: 6px;
@@ -600,6 +623,13 @@
     }
     .btn-icon:hover     { background: rgba(247,255,246,.08); color: #F7FFF6; }
     .btn-icon.del:hover { background: rgba(238,66,102,.15);  color: #EE4266; }
+    .btn-icon.vis-off   { color: rgba(247,255,246,.2); }
+    .btn-icon.vis-off:hover { color: rgba(247,255,246,.7); background: rgba(247,255,246,.08); }
+
+    /* ── Hidden stop on map ─────────────────────────────────── */
+    .stop-item--hidden { opacity: 0.45; }
+    .stop-item--hidden .stop-actions { opacity: 1; }
+    .stop-item--hidden .stop-name    { text-decoration: line-through; }
 
     /* ── Trip stats ──────────────────────────────────────────── */
     .trip-stats {
@@ -1065,6 +1095,195 @@
     .gh-toggle-row label { font-size: .75rem; color: rgba(247,255,246,.6);
                            font-weight: 600; cursor: pointer; }
 
+    /* ── Detail Card Modal ──────────────────────────────── */
+    .detail-modal-bg {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.6);
+      backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 8000; padding: 16px;
+      animation: dmFadeIn .15s ease;
+    }
+    .detail-modal-bg.hidden { display: none; }
+    @keyframes dmFadeIn { from { opacity: 0 } to { opacity: 1 } }
+
+    .detail-modal {
+      background: #2A3340;
+      border-radius: 14px;
+      width: min(480px, 100%);
+      max-height: 88vh;
+      overflow-y: auto;
+      box-shadow: 0 16px 60px rgba(0,0,0,.7);
+      animation: dmSlideUp .18s ease;
+      position: relative;
+    }
+    @keyframes dmSlideUp {
+      from { transform: translateY(14px); opacity: 0 }
+      to   { transform: translateY(0);    opacity: 1 }
+    }
+
+    .detail-modal-close {
+      position: absolute; top: 12px; right: 12px;
+      background: rgba(247,255,246,.1); border: none;
+      color: rgba(247,255,246,.7); font-size: 1.1rem;
+      width: 28px; height: 28px; border-radius: 50%;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      z-index: 1; transition: background .15s, color .15s;
+      line-height: 1; font-family: inherit;
+    }
+    .detail-modal-close:hover { background: rgba(247,255,246,.18); color: #fff; }
+
+    .detail-modal-photo {
+      width: 100%; height: 180px;
+      background-size: cover; background-position: center;
+      border-radius: 14px 14px 0 0;
+      flex-shrink: 0;
+    }
+
+    .detail-modal-header {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 16px 16px 10px;
+      border-left: 4px solid transparent;
+    }
+    .detail-modal-icon-wrap {
+      width: 38px; height: 38px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .detail-modal-title {
+      font-size: 1.05rem; font-weight: 700;
+      color: rgba(247,255,246,.95); line-height: 1.25;
+      margin-bottom: 5px;
+    }
+    .detail-modal-body {
+      padding: 0 16px 16px;
+      display: flex; flex-direction: column; gap: 12px;
+    }
+
+    .detail-modal-stats {
+      display: flex; flex-wrap: wrap; gap: 6px;
+    }
+    .detail-stat {
+      display: inline-flex; align-items: center; gap: 5px;
+      background: rgba(247,255,246,.06);
+      border: 1px solid rgba(247,255,246,.09);
+      border-radius: 8px; padding: 4px 9px;
+      font-size: .72rem; color: rgba(247,255,246,.7); font-weight: 600;
+    }
+    .detail-stat svg { flex-shrink: 0; }
+    .bk-cancel-stat      { background: rgba(247,255,246,.05); border-color: rgba(247,255,246,.12); }
+    .bk-cancel-soon      { background: rgba(244,162,97,.1);  border-color: rgba(244,162,97,.35);  color: #F4A261; }
+    .bk-cancel-urgent    { background: rgba(238,66,102,.12); border-color: rgba(238,66,102,.4);   color: #EE4266; animation: cancelPulse 1.5s ease-in-out infinite; }
+    .bk-cancel-overdue   { background: rgba(238,66,102,.1);  border-color: rgba(238,66,102,.3);   color: rgba(238,66,102,.75); }
+    @keyframes cancelPulse { 0%,100% { opacity:1 } 50% { opacity:.6 } }
+    /* Cancel warning chip shown on booking list cards */
+    .bk-cancel-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: .63rem; font-weight: 700; padding: 2px 7px; border-radius: 10px;
+      border: 1px solid; margin-top: 4px;
+    }
+    .bk-cancel-chip--soon    { background: rgba(244,162,97,.12); border-color: rgba(244,162,97,.35); color: #F4A261; }
+    .bk-cancel-chip--urgent  { background: rgba(238,66,102,.14); border-color: rgba(238,66,102,.4);  color: #EE4266; }
+    .bk-cancel-chip--overdue { background: rgba(238,66,102,.1);  border-color: rgba(238,66,102,.25); color: rgba(238,66,102,.8); }
+
+    .detail-section-label {
+      font-size: .65rem; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; color: rgba(247,255,246,.35);
+      margin-bottom: 4px;
+    }
+
+    .detail-modal-notes {
+      background: rgba(247,255,246,.04);
+      border-radius: 8px; padding: 10px 12px;
+      font-size: .78rem; color: rgba(247,255,246,.7);
+      line-height: 1.55;
+    }
+
+    .detail-modal-link {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: .75rem; font-weight: 600; color: #03B5AA;
+      text-decoration: none;
+      padding: 5px 10px; border-radius: 8px;
+      background: rgba(3,181,170,.1);
+      transition: background .15s;
+    }
+    .detail-modal-link:hover { background: rgba(3,181,170,.2); }
+
+    .detail-booking-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 10px; border-radius: 8px;
+      font-size: .73rem; font-weight: 600;
+      cursor: pointer; transition: background .15s;
+    }
+
+    .detail-modal-footer {
+      display: flex; gap: 8px; padding: 10px 16px 16px;
+      border-top: 1px solid rgba(247,255,246,.08);
+    }
+    .detail-modal-footer .dm-btn {
+      flex: 1; padding: 9px 6px; border-radius: 8px;
+      font-size: .78rem; font-weight: 700; cursor: pointer;
+      border: 1.5px solid rgba(247,255,246,.14);
+      background: rgba(247,255,246,.05); color: rgba(247,255,246,.75);
+      font-family: inherit;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    .detail-modal-footer .dm-btn:hover {
+      background: rgba(247,255,246,.1); color: #fff;
+      border-color: rgba(247,255,246,.25);
+    }
+    .detail-modal-footer .dm-btn-primary {
+      background: #03B5AA; color: #F7FFF6; border-color: transparent;
+    }
+    .detail-modal-footer .dm-btn-primary:hover { background: #02a09a; }
+    .detail-modal-footer .dm-btn-danger:hover {
+      background: rgba(238,66,102,.18); border-color: rgba(238,66,102,.4); color: #EE4266;
+    }
+
+    /* ── Google Places info ──────────────────────────── */
+    @keyframes gpSpin { to { transform: rotate(360deg); } }
+    .place-spinner { display: inline-block; width: 11px; height: 11px; vertical-align: middle;
+      border: 1.5px solid rgba(247,255,246,.1); border-top-color: #03B5AA;
+      border-radius: 50%; animation: gpSpin .7s linear infinite; flex-shrink: 0; }
+    .place-loading { display: flex; align-items: center; gap: 7px; font-size: .7rem; color: rgba(247,255,246,.4); padding: 5px 0; }
+    .place-error { font-size: .7rem; color: rgba(238,66,102,.7); padding: 3px 0; }
+    .place-photo-strip { display: flex; gap: 3px; margin-top: 8px; height: 76px; border-radius: 7px; overflow: hidden; }
+    .place-strip-photo { flex: 1; min-width: 0; object-fit: cover; height: 76px; }
+    .place-info-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 5px; font-size: .67rem; color: rgba(247,255,246,.45); }
+    .place-rating-badge { color: #F4A261; font-weight: 700; }
+    .place-rcount { color: rgba(247,255,246,.3); font-weight: 400; }
+    .place-open { color: #03B5AA; font-weight: 600; }
+    .place-closed { color: rgba(238,66,102,.6); font-weight: 600; }
+    .place-addr-short { color: rgba(247,255,246,.4); }
+    .place-dot { color: rgba(247,255,246,.2); }
+    .place-photo-carousel { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 4px; scrollbar-width: none; }
+    .place-photo-carousel::-webkit-scrollbar { display: none; }
+    .place-carousel-photo { height: 140px; min-width: 200px; max-width: 280px; object-fit: cover; border-radius: 8px; flex-shrink: 0; }
+    .place-carousel-photo:only-child { min-width: 100%; max-width: 100%; height: 160px; }
+    .place-meta-grid { display: flex; flex-direction: column; gap: 5px; margin: 6px 0; }
+    .place-meta-row { display: flex; gap: 10px; align-items: baseline; font-size: .74rem; }
+    .place-meta-lbl { color: rgba(247,255,246,.35); font-weight: 700; font-size: .64rem; text-transform: uppercase; letter-spacing: .05em; min-width: 54px; flex-shrink: 0; }
+    .place-meta-val { color: rgba(247,255,246,.75); }
+    .place-meta-sub { color: rgba(247,255,246,.35); font-size: .68rem; }
+    .place-rating-val { color: #F4A261; font-weight: 700; }
+    .place-meta-link { color: #03B5AA; text-decoration: none; word-break: break-all; }
+    .place-meta-link:hover { text-decoration: underline; }
+    .place-summary { font-size: .75rem; color: rgba(247,255,246,.6); line-height: 1.55; margin: 6px 0; font-style: italic; }
+    .place-hours { margin: 4px 0; }
+    .place-hours-summary { font-size: .7rem; font-weight: 600; color: rgba(247,255,246,.4); cursor: pointer; user-select: none; list-style: none; padding: 4px 0; }
+    .place-hours-summary:hover { color: rgba(247,255,246,.65); }
+    .place-hours-body { padding: 4px 0 2px 4px; }
+    .place-hour-row { font-size: .7rem; color: rgba(247,255,246,.45); padding: 2px 0; }
+    .place-attribution { display: flex; align-items: center; gap: 5px; margin-top: 8px; padding-top: 6px; border-top: 1px solid rgba(247,255,246,.07); font-size: .63rem; color: rgba(247,255,246,.3); }
+    .place-fetch-btn { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 9px; border-radius: 8px; background: rgba(247,255,246,.04); border: 1.5px dashed rgba(247,255,246,.14); color: rgba(247,255,246,.45); font-size: .75rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .15s, border-color .15s, color .15s; }
+    .place-fetch-btn:hover { background: rgba(247,255,246,.08); border-color: rgba(247,255,246,.25); color: rgba(247,255,246,.8); }
+    .place-fetch-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .place-refresh-mini { background: none; border: none; color: rgba(247,255,246,.35); cursor: pointer; font-size: .72rem; padding: 1px 5px; border-radius: 4px; font-family: inherit; transition: color .15s, background .15s; }
+    .place-refresh-mini:hover { color: rgba(247,255,246,.8); background: rgba(247,255,246,.08); }
+    .place-setup-msg { font-size: .72rem; color: rgba(247,255,246,.45); line-height: 1.55; padding: 4px 0 6px; }
+    .place-setup-btn { margin-top: 6px; padding: 5px 12px; border-radius: 7px; background: rgba(247,255,246,.07); border: 1px solid rgba(247,255,246,.14); color: rgba(247,255,246,.65); font-size: .7rem; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .place-setup-btn:hover { background: rgba(247,255,246,.12); }
+
     /* ── Mobile view-toggle FAB ──────────────────────────────── */
     #btn-mobile-view { display: none; }
     @media (max-width: 680px) {
@@ -1149,13 +1368,20 @@
     /* Booking items in nav */
     .nav-booking-item {
       display: flex; align-items: center; gap: 8px;
-      padding: 5px 12px; cursor: pointer; transition: background .1s;
+      padding: 5px 12px 5px 12px; cursor: pointer; transition: background .1s;
     }
     .nav-booking-item:hover { background: rgba(247,255,246,.05); }
     .nav-booking-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-    .nav-booking-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+    .nav-booking-info { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
     .nav-booking-name { font-size: .70rem; color: rgba(247,255,246,.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .nav-booking-meta { font-size: .61rem; color: rgba(247,255,246,.35); }
+    .nav-booking-del {
+      flex-shrink: 0; width: 22px; height: 22px; border: none; background: none;
+      border-radius: 4px; display: flex; align-items: center; justify-content: center;
+      color: rgba(247,255,246,.25); cursor: pointer; opacity: 0; transition: opacity .15s, background .15s, color .15s;
+    }
+    .nav-booking-item:hover .nav-booking-del { opacity: 1; }
+    .nav-booking-del:hover { background: rgba(238,66,102,.15) !important; color: #EE4266 !important; }
     .nav-empty { padding: 6px 12px; font-size: .69rem; color: rgba(247,255,246,.25); font-style: italic; }
 
     /* ── Day nav header (replaces tabs bar in middle panel) ────── */
@@ -1235,10 +1461,73 @@
     .prio-btn--2.prio-active { background: rgba(255,159,67,.16);  color: #FF9F43; border-color: rgba(255,159,67,.4); }
     .prio-btn--3.prio-active { background: rgba(116,125,140,.16); color: #A0A8B0; border-color: rgba(116,125,140,.4); }
 
+    /* ── Tag input widget ─────────────────────────────── */
+    .tag-input-wrap {
+      position: relative;
+      border: 1.5px solid rgba(247,255,246,.12);
+      border-radius: 8px;
+      background: rgba(247,255,246,.04);
+      padding: 4px 6px;
+      cursor: text;
+      min-height: 32px;
+      display: flex; flex-direction: column; gap: 2px;
+    }
+    .tag-input-wrap:focus-within { border-color: rgba(247,255,246,.3); }
+    .tag-chips-inner { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .tag-chip-input {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: rgba(100,180,255,.14); color: #64B4FF;
+      font-size: .65rem; font-weight: 700;
+      padding: 2px 6px 2px 8px; border-radius: 10px; white-space: nowrap;
+    }
+    .tag-chip-input .tag-chip-x {
+      cursor: pointer; font-size: .75rem; opacity: .65; margin-left: 1px;
+      line-height: 1; padding: 0 1px;
+    }
+    .tag-chip-input .tag-chip-x:hover { opacity: 1; color: #ff6b6b; }
+    .tag-input-field {
+      background: none; border: none; outline: none;
+      color: rgba(247,255,246,.8); font-size: .75rem;
+      min-width: 80px; flex: 1;
+      padding: 2px 0;
+    }
+    .tag-input-field::placeholder { color: rgba(247,255,246,.25); }
+    .tag-suggest-list {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 200;
+      background: #1e2630; border: 1px solid rgba(247,255,246,.12);
+      border-radius: 8px; overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,.4);
+    }
+    .tag-suggest-item {
+      padding: 7px 12px; font-size: .75rem; color: rgba(247,255,246,.75);
+      cursor: pointer;
+    }
+    .tag-suggest-item:hover { background: rgba(247,255,246,.07); color: #fff; }
+    /* Tag chips on stop/booking cards */
+    .stop-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+    .tag-chip-display {
+      display: inline-flex; align-items: center;
+      background: rgba(100,180,255,.12); color: #64B4FF;
+      font-size: .62rem; font-weight: 700;
+      padding: 2px 7px; border-radius: 10px; white-space: nowrap;
+    }
+    /* Tag filter chips in filter bar */
+    .tag-filter-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: .7rem; font-weight: 600; cursor: pointer;
+      border: 1.5px solid rgba(100,180,255,.25);
+      background: rgba(100,180,255,.07); color: rgba(247,255,246,.55);
+      transition: background .15s, color .15s, border-color .15s;
+    }
+    .tag-filter-chip.active {
+      background: rgba(100,180,255,.18); color: #64B4FF;
+      border-color: rgba(100,180,255,.4);
+    }
+
     /* ── Desktop: hide tabs bar; hide booking list (moved to nav) */
     .tabs { display: none; }
     #panel-bookings #bookings-list { display: none; }
-    .sidebar { width: 350px; }
 
     /* ── Responsive ──────────────────────────────────────────── */
     @media (max-width: 680px) {
@@ -1369,6 +1658,14 @@
           <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
         </svg>
       </button>
+      <!-- Google Places API settings -->
+      <button class="btn-trip" id="btn-gp-settings" title="Google Places API settings" onclick="openGpModal()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="10" r="3"/>
+          <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        </svg>
+      </button>
     </div>
 
     <!-- Trip date bar -->
@@ -1428,6 +1725,9 @@
       </div>
       <div class="filter-chips collapsed" id="priority-filter-section">
         <!-- populated by renderPriorityFilter() -->
+      </div>
+      <div class="filter-chips collapsed" id="tag-filter-section" style="display:none">
+        <!-- populated by renderTagFilter() -->
       </div>
       <div class="filter-chips" id="day-filter-section" style="display:none">
         <!-- populated by renderDayFilter() -->
@@ -1531,13 +1831,29 @@
         <input type="url" id="inp-photo" placeholder="https://… (shown in map popup &amp; list)" autocomplete="off" />
       </div>
 
+      <div class="form-group">
+        <label>Tags</label>
+        <div class="tag-input-wrap" id="stop-tags-wrap" onclick="focusTagInput('stop')">
+          <div class="tag-chips-inner" id="stop-tags-chips">
+            <input type="text" class="tag-input-field" id="stop-tags-input"
+                   placeholder="Add tag…" autocomplete="off"
+                   oninput="onTagInput('stop')"
+                   onkeydown="onTagKeyDown(event,'stop')"
+                   onfocus="onTagInput('stop')"
+                   onblur="setTimeout(()=>hideTagSuggestions('stop'),150)" />
+          </div>
+          <div class="tag-suggest-list" id="stop-tags-suggest" style="display:none"></div>
+        </div>
+        <div class="field-hint">Press Enter or comma to add · click × to remove</div>
+      </div>
+
       <div class="status-msg" id="status-msg">
         <span id="status-icon" class="spinner"></span>
         <span id="status-text"></span>
       </div>
 
       <button class="btn-add" id="btn-add" onclick="addStop()">+ Add Stop</button>
-      <button class="btn-cancel-edit" id="btn-cancel-edit" onclick="cancelEdit()">× Cancel edit</button>
+      <button class="btn-cancel-edit" id="btn-cancel-edit" onclick="cancelEdit()">← Back</button>
     </div>
 
     <!-- Itinerary List -->
@@ -1619,6 +1935,12 @@
       </div>
 
       <div class="form-group">
+        <label for="bk-cancel-by">Free cancellation until</label>
+        <input type="date" id="bk-cancel-by" />
+        <div class="field-hint">Leave blank if non-refundable or no deadline</div>
+      </div>
+
+      <div class="form-group">
         <label for="bk-cost">Cost</label>
         <div style="display:flex;gap:6px;align-items:center">
           <input type="number" id="bk-cost" min="0" step="0.01"
@@ -1628,6 +1950,13 @@
                  oninput="this.value=this.value.toUpperCase()" />
         </div>
         <div class="field-hint">Amount · Currency code (USD, EUR, AUD…)</div>
+      </div>
+
+      <div class="form-group">
+        <label for="bk-booking-url">Booking link</label>
+        <input type="url" id="bk-booking-url"
+               placeholder="https://booking.com/… or airbnb.com/…" autocomplete="off" />
+        <div class="field-hint">booking.com, Airbnb, GetYourGuide, Viator, etc.</div>
       </div>
 
       <div class="form-group">
@@ -1643,6 +1972,22 @@
         <div class="field-hint">Supports **bold**, *italic*, - lists, [links](url)</div>
       </div>
 
+      <div class="form-group">
+        <label>Tags</label>
+        <div class="tag-input-wrap" id="bk-tags-wrap" onclick="focusTagInput('bk')">
+          <div class="tag-chips-inner" id="bk-tags-chips">
+            <input type="text" class="tag-input-field" id="bk-tags-input"
+                   placeholder="Add tag…" autocomplete="off"
+                   oninput="onTagInput('bk')"
+                   onkeydown="onTagKeyDown(event,'bk')"
+                   onfocus="onTagInput('bk')"
+                   onblur="setTimeout(()=>hideTagSuggestions('bk'),150)" />
+          </div>
+          <div class="tag-suggest-list" id="bk-tags-suggest" style="display:none"></div>
+        </div>
+        <div class="field-hint">Press Enter or comma to add · click × to remove</div>
+      </div>
+
       <div class="status-msg" id="bk-status-msg">
         <span id="bk-status-icon" class="spinner"></span>
         <span id="bk-status-text"></span>
@@ -1650,7 +1995,7 @@
 
       <button class="btn-add" id="btn-booking-add" onclick="addBooking()">+ Add Booking</button>
       <button class="btn-cancel-edit" id="btn-booking-cancel"
-              onclick="cancelBookingEdit()" style="display:none">× Cancel edit</button>
+              onclick="cancelBookingEdit()">← Back</button>
 
       <div style="margin-top:18px">
         <div class="bookings-section-title">Saved Bookings</div>
@@ -1661,7 +2006,7 @@
   </div><!-- /sidebar -->
 
   <!-- Sidebar collapse handle -->
-  <div class="sidebar-handle" id="sidebar-handle" onclick="toggleSidebar()" title="Collapse sidebar">
+  <div class="sidebar-handle" id="sidebar-handle" title="Drag to resize · Click to collapse">
     <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
          stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="15 18 9 12 15 6"/>
@@ -1702,6 +2047,18 @@ const TYPES = {
   shopping: {
     label: 'Shopping', color: '#f26b88',
     svgPath: 'M216,40H40A16,16,0,0,0,24,56V200a16,16,0,0,0,16,16H216a16,16,0,0,0,16-16V56A16,16,0,0,0,216,40Zm0,160H40V56H216V200ZM176,88a48,48,0,0,1-96,0,8,8,0,0,1,16,0,32,32,0,0,0,64,0,8,8,0,0,1,16,0Z',
+  },
+  transport: {
+    label: 'Transport', color: '#5B8DD9',
+    svgPath: 'M240,112H229.2L201.42,49.5A16,16,0,0,0,186.8,40H69.2a16,16,0,0,0-14.62,9.5L26.8,112H16a8,8,0,0,0,0,16h8v80a16,16,0,0,0,16,16H56a16,16,0,0,0,16-16v-8H184v8a16,16,0,0,0,16,16h16a16,16,0,0,0,16-16V128h8a8,8,0,0,0,0-16ZM69.2,56H186.8l24.89,56H44.31ZM216,208H200V184a8,8,0,0,0-16,0v8H72v-8a8,8,0,0,0-16,0v24H40V128H216ZM76,164a12,12,0,1,1,12,12A12,12,0,0,1,76,164Zm92,0a12,12,0,1,1,12,12A12,12,0,0,1,168,164Z',
+  },
+  sleep: {
+    label: 'Sleep', color: '#9B59B6',
+    svgPath: 'M235.54,150.21a104.84,104.84,0,0,1-37,52.91A104,104,0,0,1,32,120,103.09,103.09,0,0,1,52.88,57.48a104.84,104.84,0,0,1,52.91-37,8,8,0,0,1,10,10,88.08,88.08,0,0,0,109.8,109.8,8,8,0,0,1,10,10Z',
+  },
+  chill: {
+    label: 'Chill', color: '#F4A261',
+    svgPath: 'M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72ZM216,120H240a8,8,0,0,0,0-16H216a8,8,0,0,0,0,16Zm-32,56a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM120,216a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V224A8,8,0,0,0,120,216ZM40,128a8,8,0,0,0-8-8H8a8,8,0,0,0,0,16H32A8,8,0,0,0,40,128Z',
   },
   other: {
     label: 'Other', color: '#c4c11c',
@@ -1754,9 +2111,15 @@ let description       = '';                         // active trip markdown desc
 let savedAt           = 0;                          // timestamp of last save (for sync conflict resolution)
 let githubSettings    = { pat:'', owner:'', repo:'', path:'trips.json', autoSync:false };
 let lastSyncTime      = null;                       // Date of last successful GitHub sync
+// Google Places API key: config.js (project file, gitignored) takes priority over localStorage
+let googlePlacesApiKey = window.APP_CONFIG?.googlePlacesApiKey || localStorage.getItem('gp_api_key') || '';
+const _gpKeyFromConfig  = !!(window.APP_CONFIG?.googlePlacesApiKey);  // true when loaded from config.js
 let visibleTypes          = new Set(Object.keys(TYPES));  // types currently shown on map
 let activeDayFilter       = new Set();                    // selected days; empty = all shown
 let activePriorityFilter  = new Set([1, 2, 3]);           // shown priorities; all 3 = no filter
+let _stopFormTags   = [];                                 // tags being edited in the stop form
+let _bkFormTags     = [];                                 // tags being edited in the booking form
+let activeTagFilter = new Set();                          // selected tags; empty = all shown
 let filterBarOpen = false;                                // filter chip panel open/closed
 let timelineView      = false;                       // itinerary timeline vs card list
 let tlFetchInProgress = false;                       // guard: prevent concurrent fetchTimelineDriving()
@@ -2112,6 +2475,7 @@ async function addStop() {
   const startTime  = document.getElementById('inp-start').value;
   const endTime    = document.getElementById('inp-end').value;
   const priority   = parseInt(document.getElementById('inp-priority').value) || 1;
+  const tags       = [..._stopFormTags];
   const btn        = document.getElementById('btn-add');
 
   // Booking link — if set the stop inherits the booking's coordinates
@@ -2159,15 +2523,24 @@ async function addStop() {
       // Update existing stop in-place
       const idx = stops.findIndex(s => s.id === editingId);
       if (idx !== -1) {
-        stops[idx] = { ...stops[idx], day, endDay: endDay > day ? endDay : undefined, type, priority, name, mapsUrl,
-                       lat: coords.lat, lng: coords.lng, notes, photoUrl, startTime, endTime, bookingRef };
+        stops[idx] = { ...stops[idx], day, endDay: endDay > day ? endDay : undefined, type, priority,
+                       tags: tags.length ? tags : undefined,
+                       name, mapsUrl, lat: coords.lat, lng: coords.lng, notes, photoUrl,
+                       startTime, endTime, bookingRef };
       }
       editingId = null;
-      document.getElementById('btn-add').textContent            = '+ Add Stop';
-      document.getElementById('btn-cancel-edit').style.display  = 'none';
+      document.getElementById('btn-add').textContent           = '+ Add Stop';
+      document.getElementById('btn-cancel-edit').textContent   = '← Back';
     } else {
-      stops.push({ id: Date.now(), day, endDay: endDay > day ? endDay : undefined, type, priority, name, mapsUrl,
-                   lat: coords.lat, lng: coords.lng, notes, photoUrl, startTime, endTime, bookingRef });
+      stops.push({ id: Date.now(), day, endDay: endDay > day ? endDay : undefined, type, priority,
+                   tags: tags.length ? tags : undefined,
+                   name, mapsUrl, lat: coords.lat, lng: coords.lng, notes, photoUrl,
+                   startTime, endTime, bookingRef });
+      // Auto-fetch Places info for new stops (non-blocking)
+      if (googlePlacesApiKey) {
+        const newId = stops[stops.length - 1].id;
+        fetchPlacesInfo(newId);
+      }
     }
     save();
 
@@ -2182,6 +2555,8 @@ async function addStop() {
     document.getElementById('inp-end-day').value      = document.getElementById('inp-day').value;
     document.getElementById('inp-booking-ref').value  = '';
     selectPriority(1);
+    _stopFormTags = [];
+    renderFormTags('stop');
     renderBookingRefSelect();
     clearStatus();
 
@@ -2199,6 +2574,16 @@ async function addStop() {
 document.getElementById('inp-name').addEventListener('keydown', e => {
   if (e.key === 'Enter') addStop();
 });
+
+// ─── Toggle stop map visibility ───────────────────────────────────────
+function toggleStopVisibility(id) {
+  const s = stops.find(s => s.id === id);
+  if (!s) return;
+  s.hidden = !s.hidden;
+  save();
+  renderList();
+  updateMap();
+}
 
 // ─── Delete stop ──────────────────────────────────────────────────────
 function deleteStop(id) {
@@ -2231,6 +2616,8 @@ function editStop(id) {
       : '';
   document.getElementById('inp-end').value   = s.endTime   || '';
   selectPriority(s.priority || 1);
+  _stopFormTags = [...(s.tags || [])];
+  renderFormTags('stop');
 
   // Booking reference
   const bkSel = document.getElementById('inp-booking-ref');
@@ -2243,8 +2630,8 @@ function editStop(id) {
 
   // Switch UI to edit mode
   editingId = id;
-  document.getElementById('btn-add').textContent            = '✓ Save Changes';
-  document.getElementById('btn-cancel-edit').style.display  = 'block';
+  document.getElementById('btn-add').textContent          = '✓ Save Changes';
+  document.getElementById('btn-cancel-edit').textContent  = '× Cancel edit';
   clearStatus();
   showTab('add');
   document.getElementById('inp-name').focus();
@@ -2253,8 +2640,8 @@ function editStop(id) {
 // ─── Cancel edit ──────────────────────────────────────────────────────
 function cancelEdit() {
   editingId = null;
-  document.getElementById('btn-add').textContent            = '+ Add Stop';
-  document.getElementById('btn-cancel-edit').style.display  = 'none';
+  document.getElementById('btn-add').textContent          = '+ Add Stop';
+  document.getElementById('btn-cancel-edit').textContent  = '← Back';
   document.getElementById('inp-name').value  = '';
   document.getElementById('inp-maps').value  = '';
   document.getElementById('inp-notes').value = '';
@@ -2265,6 +2652,8 @@ function cancelEdit() {
   document.getElementById('inp-end-day').value  = 1;
   document.getElementById('inp-booking-ref').value = '';
   selectPriority(1);
+  _stopFormTags = [];
+  renderFormTags('stop');
   renderBookingRefSelect();
   clearStatus();
   showTab('list');
@@ -2295,7 +2684,6 @@ function focusStop(id) {
   const s = stops.find(s => s.id === id);
   if (!s) return;
   map.setView([s.lat, s.lng], 14, { animate: true });
-  if (markerMap[id]) markerMap[id].openPopup();
 }
 
 // ─── Tab switching ─────────────────────────────────────────────────────
@@ -2321,6 +2709,577 @@ function focusBooking(id) {
     setTimeout(() => card.classList.remove('span-item--highlight'), 1200);
   }, 50);
 }
+
+// ── Google Places API ──────────────────────────────────────────────────
+function _fmtCount(n) {
+  if (!n) return '0';
+  if (n >= 1000000) return (n / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+  if (n >= 1000)    return (n / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return String(n);
+}
+
+function _priceLevelStr(level) {
+  const map = {
+    PRICE_LEVEL_FREE: 'Free',
+    PRICE_LEVEL_INEXPENSIVE: '$',
+    PRICE_LEVEL_MODERATE: '$$',
+    PRICE_LEVEL_EXPENSIVE: '$$$',
+    PRICE_LEVEL_VERY_EXPENSIVE: '$$$$',
+  };
+  return map[level] || '';
+}
+
+async function fetchPlacesInfo(stopId, forceRefresh = false) {
+  const s = stops.find(s => s.id === stopId);
+  if (!s) return;
+  if (!googlePlacesApiKey) return;
+  if (s.place && !s.place.error && !forceRefresh) return; // already have data
+
+  // Mark loading
+  s.place = { loading: true };
+  save();
+  renderList();
+  // Refresh open modal if it's showing this stop
+  const bg = document.getElementById('detail-modal');
+  if (!bg.classList.contains('hidden')) {
+    const inner = document.getElementById('detail-modal-inner');
+    const refreshBtn = inner.querySelector('[data-gp-stopid="' + stopId + '"]');
+    if (refreshBtn) refreshBtn.disabled = true;
+  }
+
+  try {
+    const FIELD_MASK = [
+      'places.id', 'places.displayName', 'places.rating', 'places.userRatingCount',
+      'places.formattedAddress', 'places.websiteUri', 'places.nationalPhoneNumber',
+      'places.regularOpeningHours', 'places.currentOpeningHours',
+      'places.photos', 'places.editorialSummary', 'places.types', 'places.priceLevel'
+    ].join(',');
+
+    const body = { textQuery: s.name };
+    if (s.lat && s.lng) {
+      body.locationBias = { circle: { center: { latitude: s.lat, longitude: s.lng }, radius: 10000 } };
+    }
+
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': googlePlacesApiKey,
+        'X-Goog-FieldMask': FIELD_MASK,
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const errText = await res.text();
+      throw new Error('HTTP ' + res.status + ': ' + errText.slice(0, 120));
+    }
+
+    const data = await res.json();
+    const p = (data.places || [])[0];
+    if (!p) throw new Error('No results found for "' + s.name + '"');
+
+    // Fetch up to 3 photo CDN URLs
+    const photoUrls = [];
+    if (p.photos && googlePlacesApiKey) {
+      const photoRefs = p.photos.slice(0, 3);
+      const photoPromises = photoRefs.map(ph =>
+        fetch(`https://places.googleapis.com/v1/${ph.name}/media?maxWidthPx=800&skipHttpRedirect=true&key=${encodeURIComponent(googlePlacesApiKey)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(j => j && j.photoUri ? j.photoUri : null)
+          .catch(() => null)
+      );
+      const resolved = await Promise.all(photoPromises);
+      resolved.forEach(u => u && photoUrls.push(u));
+    }
+
+    const hours = p.regularOpeningHours?.weekdayDescriptions || [];
+    const openNow = p.currentOpeningHours?.openNow ?? null;
+
+    s.place = {
+      loading: false,
+      error: null,
+      id: p.id || '',
+      displayName: p.displayName?.text || s.name,
+      rating: p.rating || null,
+      ratingCount: p.userRatingCount || null,
+      address: p.formattedAddress || '',
+      website: p.websiteUri || '',
+      phone: p.nationalPhoneNumber || '',
+      hours,
+      openNow,
+      summary: p.editorialSummary?.text || '',
+      types: (p.types || []).slice(0, 4),
+      priceLevel: p.priceLevel || '',
+      photos: photoUrls,
+      fetchedAt: Date.now(),
+    };
+  } catch (err) {
+    s.place = { loading: false, error: err.message };
+  }
+
+  save();
+  renderList();
+  // Refresh modal content if it's still open for this stop
+  const bgEl = document.getElementById('detail-modal');
+  if (!bgEl.classList.contains('hidden')) {
+    const inner = document.getElementById('detail-modal-inner');
+    const placeSection = inner.querySelector('.gp-modal-section[data-gp-stopid="' + stopId + '"]');
+    if (placeSection) {
+      placeSection.outerHTML = _placeModalSectionHtml(s, stopId);
+    }
+  }
+}
+
+function renderPlaceCardHtml(s) {
+  const pl = s.place;
+  if (!pl) return '';
+  if (pl.loading) {
+    return '<div class="place-loading"><span class="place-spinner"></span> Fetching place info…</div>';
+  }
+  if (pl.error) {
+    return `<div class="place-error" title="${esc(pl.error)}">⚠ Places data unavailable</div>`;
+  }
+
+  let html = '';
+
+  // Photo strip (up to 3)
+  if (pl.photos && pl.photos.length) {
+    html += '<div class="place-photo-strip">';
+    pl.photos.forEach(u => {
+      html += `<img class="place-strip-photo" src="${esc(u)}" alt="" loading="lazy" onerror="this.style.display='none'">`;
+    });
+    html += '</div>';
+  }
+
+  // Info bar: rating · open/closed · short address
+  const parts = [];
+  if (pl.rating) parts.push(`<span class="place-rating-badge">★ ${pl.rating.toFixed(1)}</span><span class="place-rcount">(${_fmtCount(pl.ratingCount)})</span>`);
+  if (pl.openNow === true)  parts.push('<span class="place-open">Open</span>');
+  if (pl.openNow === false) parts.push('<span class="place-closed">Closed</span>');
+  if (pl.address) {
+    const shortAddr = pl.address.split(',').slice(0, 2).join(',').trim();
+    parts.push(`<span class="place-addr-short">${esc(shortAddr)}</span>`);
+  }
+
+  if (parts.length) {
+    html += '<div class="place-info-bar">' + parts.join('<span class="place-dot">·</span>') + '</div>';
+  }
+
+  return html;
+}
+
+function _placeModalSectionHtml(s, stopId) {
+  const pl = s.place;
+  const refreshBtn = `<button class="place-refresh-mini" data-gp-stopid="${stopId}"
+      onclick="fetchPlacesInfo(${stopId},true)" title="Refresh from Google Places">↻ Refresh</button>`;
+
+  if (!pl) {
+    if (!googlePlacesApiKey) {
+      return `<div class="gp-modal-section" data-gp-stopid="${stopId}">
+        <div class="detail-section-label">Google Places</div>
+        <div class="place-setup-msg">Add a Google Places API key to automatically fetch ratings, hours, photos and more for your stops.</div>
+        <button class="place-setup-btn" onclick="closeDetailModal();openGpModal()">Set up API key</button>
+      </div>`;
+    }
+    return `<div class="gp-modal-section" data-gp-stopid="${stopId}">
+      <div class="detail-section-label">Google Places</div>
+      <button class="place-fetch-btn" onclick="fetchPlacesInfo(${stopId})">
+        🌐 Fetch place info from Google
+      </button>
+    </div>`;
+  }
+
+  if (pl.loading) {
+    return `<div class="gp-modal-section" data-gp-stopid="${stopId}">
+      <div class="detail-section-label">Google Places</div>
+      <div class="place-loading"><span class="place-spinner"></span> Fetching…</div>
+    </div>`;
+  }
+
+  if (pl.error) {
+    return `<div class="gp-modal-section" data-gp-stopid="${stopId}">
+      <div class="detail-section-label" style="display:flex;align-items:center;justify-content:space-between">
+        Google Places ${refreshBtn}
+      </div>
+      <div class="place-error">⚠ ${esc(pl.error)}</div>
+    </div>`;
+  }
+
+  let html = `<div class="gp-modal-section" data-gp-stopid="${stopId}">
+    <div class="detail-section-label" style="display:flex;align-items:center;justify-content:space-between">
+      <span>Google Places</span>${refreshBtn}
+    </div>`;
+
+  // Photo carousel
+  if (pl.photos && pl.photos.length) {
+    html += '<div class="place-photo-carousel">';
+    pl.photos.forEach(u => {
+      html += `<img class="place-carousel-photo" src="${esc(u)}" alt="" loading="lazy" onerror="this.parentElement.removeChild(this)">`;
+    });
+    html += '</div>';
+  }
+
+  // Meta grid
+  const metaRows = [];
+  if (pl.rating)    metaRows.push(`<span class="place-meta-lbl">Rating</span><span class="place-meta-val place-rating-val">★ ${pl.rating.toFixed(1)}</span><span class="place-meta-sub">&nbsp;(${_fmtCount(pl.ratingCount)} reviews)</span>`);
+  if (pl.openNow === true)  metaRows.push(`<span class="place-meta-lbl">Hours</span><span class="place-open">Open now</span>`);
+  if (pl.openNow === false) metaRows.push(`<span class="place-meta-lbl">Hours</span><span class="place-closed">Closed now</span>`);
+  if (pl.priceLevel) metaRows.push(`<span class="place-meta-lbl">Price</span><span class="place-meta-val">${esc(_priceLevelStr(pl.priceLevel))}</span>`);
+  if (pl.phone)     metaRows.push(`<span class="place-meta-lbl">Phone</span><span class="place-meta-val">${esc(pl.phone)}</span>`);
+  if (pl.address)   metaRows.push(`<span class="place-meta-lbl">Address</span><span class="place-meta-val">${esc(pl.address)}</span>`);
+  if (pl.website)   metaRows.push(`<span class="place-meta-lbl">Web</span><a class="place-meta-link" href="${esc(pl.website)}" target="_blank" rel="noopener">${esc(pl.website.replace(/^https?:\/\/(www\.)?/, '').split('/')[0])}</a>`);
+
+  if (metaRows.length) {
+    html += '<div class="place-meta-grid">';
+    metaRows.forEach(row => { html += `<div class="place-meta-row">${row}</div>`; });
+    html += '</div>';
+  }
+
+  // Summary / editorial
+  if (pl.summary) {
+    html += `<div class="place-summary">"${esc(pl.summary)}"</div>`;
+  }
+
+  // Weekly hours
+  if (pl.hours && pl.hours.length) {
+    html += `<details class="place-hours">
+      <summary class="place-hours-summary">▸ Opening hours</summary>
+      <div class="place-hours-body">`;
+    pl.hours.forEach(row => { html += `<div class="place-hour-row">${esc(row)}</div>`; });
+    html += '</div></details>';
+  }
+
+  // Attribution
+  html += '<div class="place-attribution">Powered by Google</div>';
+
+  html += '</div>'; // close gp-modal-section
+  return html;
+}
+
+function renderPlaceModalHtml(s, stopId) {
+  return _placeModalSectionHtml(s, stopId);
+}
+
+// ── Google Places Modal Controls ───────────────────────────────────────
+function openGpModal() {
+  const input   = document.getElementById('gp-api-key');
+  const notice  = document.getElementById('gp-config-notice');
+  const saveBtn = document.querySelector('#gp-modal-bg .btn-gh-save');
+
+  input.value = googlePlacesApiKey || '';
+
+  if (_gpKeyFromConfig) {
+    // Key is coming from config.js — show read-only notice, disable save
+    input.readOnly = true;
+    input.style.opacity = '0.55';
+    if (notice) notice.style.display = '';
+    if (saveBtn) saveBtn.style.display = 'none';
+  } else {
+    input.readOnly = false;
+    input.style.opacity = '';
+    if (notice) notice.style.display = 'none';
+    if (saveBtn) saveBtn.style.display = '';
+  }
+
+  document.getElementById('gp-modal-bg').classList.remove('hidden');
+}
+
+function closeGpModal() {
+  document.getElementById('gp-modal-bg').classList.add('hidden');
+}
+
+function saveGpKey() {
+  if (_gpKeyFromConfig) {
+    showToast('Key is set in config.js — edit that file to change it');
+    closeGpModal();
+    return;
+  }
+  const key = document.getElementById('gp-api-key').value.trim();
+  googlePlacesApiKey = key;
+  try { localStorage.setItem('gp_api_key', key); } catch (e) {}
+  closeGpModal();
+  showToast(key ? 'Google Places API key saved ✓' : 'API key cleared');
+}
+
+async function testGpKey() {
+  const key = document.getElementById('gp-api-key').value.trim();
+  if (!key) { showToast('Enter an API key first'); return; }
+  const btn = document.querySelector('#gp-modal-bg .btn-gh-test');
+  btn.disabled = true; btn.textContent = 'Testing…';
+  try {
+    const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Goog-Api-Key': key,
+        'X-Goog-FieldMask': 'places.displayName',
+      },
+      body: JSON.stringify({ textQuery: 'Eiffel Tower Paris' }),
+    });
+    if (res.ok) {
+      const d = await res.json();
+      const name = d.places?.[0]?.displayName?.text;
+      showToast(name ? `✓ Key works! Found: ${name}` : '✓ Key works!');
+    } else {
+      const e = await res.json().catch(() => ({}));
+      showToast('✗ ' + (e.error?.message || 'HTTP ' + res.status));
+    }
+  } catch (err) {
+    showToast('✗ Network error: ' + err.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Test key';
+  }
+}
+
+// ── Detail Modal ───────────────────────────────────────────────────────
+function closeDetailModal() {
+  document.getElementById('detail-modal').classList.add('hidden');
+}
+
+function openStopCard(id) {
+  const s = stops.find(s => s.id === id);
+  if (!s) return;
+  const t      = TYPES[s.type] || TYPES.other;
+  const dayStr = s.endDay && s.endDay > (s.day || 0)
+    ? `Days ${s.day}–${s.endDay}` : `Day ${s.day || '?'}`;
+  const dateStr   = s.day ? formatDayDate(s.day) : '';
+  const linkedSi  = s.bookingRef ? spanItems.find(si => si.id === s.bookingRef) : null;
+  const bkColor   = linkedSi ? (SPAN_TYPES[linkedSi.type]?.color || '#94A3B8') : '';
+
+  const heroPhoto = s.photoUrl || (s.place && !s.place.loading && !s.place.error && s.place.photos && s.place.photos[0]);
+  const inner = document.getElementById('detail-modal-inner');
+  inner.innerHTML = `
+    <button class="detail-modal-close" onclick="closeDetailModal()">&#x2715;</button>
+    ${heroPhoto ? `<div class="detail-modal-photo"
+        style="background-image:url('${esc(heroPhoto)}')"
+        onerror="this.style.display='none'"></div>` : ''}
+    <div class="detail-modal-header" style="border-left-color:${t.color}">
+      <div class="detail-modal-icon-wrap" style="background:${t.color}20">
+        ${iconHtml(s.type, { size: 22 })}
+      </div>
+      <div>
+        <div class="detail-modal-title">${esc(s.name)}</div>
+        <span class="type-pill" style="background:${t.color}20;color:${t.color}">${t.label}</span>
+      </div>
+    </div>
+    <div class="detail-modal-body">
+      <div class="detail-modal-stats">
+        <span class="detail-stat">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          ${dayStr}${dateStr ? ' · ' + dateStr : ''}
+        </span>
+        ${s.startTime ? `<span class="detail-stat">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          ${s.startTime}${s.endTime ? ' – ' + s.endTime : ''}
+        </span>` : ''}
+        ${s.priority ? `<span class="detail-stat">
+          <span class="prio-badge prio-badge--${s.priority}" style="padding:0">
+            0${s.priority} ${ ['','Must Have','Nice to Have','Could Have'][s.priority] }
+          </span>
+        </span>` : ''}
+      </div>
+      ${s.tags && s.tags.length ? `<div>${renderTagChipsHtml(s.tags)}</div>` : ''}
+      ${s.notes ? `
+        <div>
+          <div class="detail-section-label">Notes</div>
+          <div class="detail-modal-notes md-content">${renderMarkdown(s.notes)}</div>
+        </div>` : ''}
+      ${linkedSi ? `
+        <div>
+          <div class="detail-section-label">Linked Booking</div>
+          <span class="detail-booking-chip"
+                style="background:${bkColor}18;color:${bkColor};border:1px solid ${bkColor}30"
+                onclick="closeDetailModal();setTimeout(()=>openBookingCard(${linkedSi.id}),80)">
+            📋 ${esc(linkedSi.name)}
+          </span>
+        </div>` : ''}
+      ${s.mapsUrl ? `<div>
+        <a class="detail-modal-link" href="${esc(s.mapsUrl)}" target="_blank" rel="noopener">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          Open in Maps
+        </a>
+      </div>` : ''}
+      <div class="detail-modal-divider"></div>
+      ${renderPlaceModalHtml(s, s.id)}
+    </div>
+    <div class="detail-modal-footer">
+      <button class="dm-btn dm-btn-danger"
+              onclick="if(confirm('Delete this stop?')){closeDetailModal();deleteStop(${s.id})}">
+        Delete
+      </button>
+      <button class="dm-btn"
+              onclick="closeDetailModal();focusStop(${s.id})">
+        Show on Map
+      </button>
+      <button class="dm-btn dm-btn-primary"
+              onclick="closeDetailModal();editStop(${s.id})">
+        Edit
+      </button>
+    </div>`;
+  document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+function detectBookingPlatform(url) {
+  if (!url) return null;
+  const u = url.toLowerCase();
+  if (u.includes('booking.com'))     return { name: 'Booking.com',   icon: '🏨' };
+  if (u.includes('airbnb.'))         return { name: 'Airbnb',         icon: '🏠' };
+  if (u.includes('getyourguide.'))   return { name: 'GetYourGuide',   icon: '🎟️' };
+  if (u.includes('viator.'))         return { name: 'Viator',         icon: '🎟️' };
+  if (u.includes('klook.'))          return { name: 'Klook',          icon: '🎟️' };
+  if (u.includes('expedia.'))        return { name: 'Expedia',        icon: '✈️' };
+  if (u.includes('hotels.com'))      return { name: 'Hotels.com',     icon: '🏨' };
+  if (u.includes('hostelworld.'))    return { name: 'Hostelworld',    icon: '🛏️' };
+  if (u.includes('vrbo.'))           return { name: 'VRBO',           icon: '🏡' };
+  if (u.includes('kayak.'))          return { name: 'Kayak',          icon: '✈️' };
+  if (u.includes('skyscanner.'))     return { name: 'Skyscanner',     icon: '✈️' };
+  if (u.includes('ryanair.'))        return { name: 'Ryanair',        icon: '✈️' };
+  if (u.includes('easyjet.'))        return { name: 'easyJet',        icon: '✈️' };
+  if (u.includes('tripadvisor.'))    return { name: 'TripAdvisor',    icon: '⭐' };
+  if (u.includes('rentalcars.'))     return { name: 'RentalCars.com', icon: '🚗' };
+  if (u.includes('europcar.'))       return { name: 'Europcar',       icon: '🚗' };
+  if (u.includes('hertz.'))          return { name: 'Hertz',          icon: '🚗' };
+  if (u.includes('avis.'))           return { name: 'Avis',           icon: '🚗' };
+  if (u.includes('sixt.'))           return { name: 'Sixt',           icon: '🚗' };
+  return { name: 'Booking link', icon: '🔗' };
+}
+
+function _cancelByStatHtml(dateStr) {
+  if (!dateStr) return '';
+  const d    = new Date(dateStr);
+  const now  = new Date(); now.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - now) / 864e5);
+  const lbl  = d.toLocaleDateString('en', { day: 'numeric', month: 'short', year: 'numeric' });
+  if (diff < 0)
+    return `<span class="detail-stat bk-cancel-stat bk-cancel-overdue">⚠ Cancel by ${lbl} — overdue</span>`;
+  if (diff === 0)
+    return `<span class="detail-stat bk-cancel-stat bk-cancel-urgent">⚠ Cancel by today!</span>`;
+  if (diff <= 7)
+    return `<span class="detail-stat bk-cancel-stat bk-cancel-soon">⚠ Cancel by ${lbl} (${diff}d)</span>`;
+  return `<span class="detail-stat bk-cancel-stat">🗓 Cancel by ${lbl}</span>`;
+}
+
+function _cancelChipHtml(dateStr) {
+  if (!dateStr) return '';
+  const d    = new Date(dateStr);
+  const now  = new Date(); now.setHours(0, 0, 0, 0);
+  const diff = Math.round((d - now) / 864e5);
+  const lbl  = d.toLocaleDateString('en', { day: 'numeric', month: 'short' });
+  if (diff < 0)
+    return `<span class="bk-cancel-chip bk-cancel-chip--overdue">⚠ Cancel by ${lbl} passed</span>`;
+  if (diff === 0)
+    return `<span class="bk-cancel-chip bk-cancel-chip--urgent">⚠ Cancel by today!</span>`;
+  if (diff <= 7)
+    return `<span class="bk-cancel-chip bk-cancel-chip--soon">⚠ Cancel by ${lbl} (${diff}d)</span>`;
+  return '';   // no chip needed when deadline is comfortably far away
+}
+
+function openBookingCard(id) {
+  const si = spanItems.find(s => s.id === id);
+  if (!si) return;
+  const color  = SPAN_TYPES[si.type]?.color || '#94A3B8';
+  const label  = SPAN_TYPES[si.type]?.label || 'Booking';
+  const emoji  = {accommodation:'🏨', rental:'🚗', transport:'✈️', other_span:'📌'}[si.type] || '📌';
+  const startD = formatDayDate(si.startDay);
+  const endD   = si.endDay !== si.startDay ? formatDayDate(si.endDay) : null;
+  const dayStr = si.startDay === si.endDay
+    ? `Day ${si.startDay}${startD ? ' · ' + startD : ''}`
+    : `Days ${si.startDay}–${si.endDay}${startD ? ' · ' + startD + (endD ? ' → ' + endD : '') : ''}`;
+  const times  = [si.checkIn, si.checkOut].filter(Boolean).join(' → ');
+
+  const inner = document.getElementById('detail-modal-inner');
+  inner.innerHTML = `
+    <button class="detail-modal-close" onclick="closeDetailModal()">&#x2715;</button>
+    <div class="detail-modal-header" style="border-left-color:${color}">
+      <div class="detail-modal-icon-wrap"
+           style="background:${color}20;width:38px;height:38px;border-radius:50%;
+                  display:flex;align-items:center;justify-content:center;font-size:1.2rem">
+        ${emoji}
+      </div>
+      <div>
+        <div class="detail-modal-title">${esc(si.name)}</div>
+        <span style="background:${color}20;color:${color};padding:2px 8px;border-radius:12px;
+                     font-size:.68rem;font-weight:700">${label}</span>
+      </div>
+    </div>
+    <div class="detail-modal-body">
+      <div class="detail-modal-stats">
+        <span class="detail-stat">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/>
+            <line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>
+          </svg>
+          ${dayStr}
+        </span>
+        ${times ? `<span class="detail-stat">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          ${times}
+        </span>` : ''}
+        ${si.cost != null ? `<span class="detail-stat" style="color:#03B5AA;border-color:rgba(3,181,170,.25)">
+          💰 ${si.currency ? si.currency + '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}
+        </span>` : ''}
+        ${_cancelByStatHtml(si.cancelBy)}
+      </div>
+      ${si.tags && si.tags.length ? `<div>${renderTagChipsHtml(si.tags)}</div>` : ''}
+      ${si.notes ? `
+        <div>
+          <div class="detail-section-label">Notes</div>
+          <div class="detail-modal-notes md-content">${renderMarkdown(si.notes)}</div>
+        </div>` : ''}
+      ${si.bookingUrl ? (() => {
+          const plat = detectBookingPlatform(si.bookingUrl);
+          return `<div>
+            <a class="detail-modal-link" href="${esc(si.bookingUrl)}" target="_blank" rel="noopener">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+                <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+              </svg>
+              ${plat.icon} ${plat.name}
+            </a>
+          </div>`;
+        })() : ''}
+      ${si.mapsUrl ? `<div>
+        <a class="detail-modal-link" href="${esc(si.mapsUrl)}" target="_blank" rel="noopener">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/>
+            <circle cx="12" cy="10" r="3"/>
+          </svg>
+          Open in Maps
+        </a>
+      </div>` : ''}
+    </div>
+    <div class="detail-modal-footer">
+      <button class="dm-btn dm-btn-danger"
+              onclick="if(confirm('Delete this booking?')){closeDetailModal();deleteBooking(${si.id})}">
+        Delete
+      </button>
+      <button class="dm-btn dm-btn-primary"
+              onclick="closeDetailModal();editBooking(${si.id})">
+        Edit
+      </button>
+    </div>`;
+  document.getElementById('detail-modal').classList.remove('hidden');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetailModal(); });
 
 // ─── Utilities ───────────────────────────────────────────────────────
 function esc(t) {
@@ -2843,6 +3802,7 @@ function renderTimeline() {
   route.forEach(s => {
     if (!visibleTypes.has(s.type || 'other')) return; // skip stops excluded by type filter
     if (!prioFilterMatch(s)) return;                  // skip stops excluded by priority filter
+    if (!tagFilterMatch(s)) return;                   // skip stops excluded by tag filter
     const start = s.day || 0;
     const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
     for (let d = start; d <= end; d++) (byDay[d] = byDay[d] || []).push(s);
@@ -3110,7 +4070,7 @@ function renderTimeline() {
           + (miniRole === 'start' ? ' tl-mini-card--multiday' : '')
           + (miniRole === 'end'   ? ' tl-mini-card--multiday-end' : '');
         card.style.cssText = `border-left-color:${t.color};`;
-        card.onclick = () => focusStop(s.id);
+        card.onclick = () => openStopCard(s.id);
         const rangeMeta = isMultiDayCard
           ? ` <span class="stop-day-range-badge" style="margin-left:4px">D${s.day}–${s.endDay}</span>` : '';
         const endLabel = miniRole === 'end' ? ` · ends today` : '';
@@ -3152,6 +4112,7 @@ function renderList() {
 
   renderDayFilter();
   renderPriorityFilter();
+  renderTagFilter();
 
   if (!stops.length && !spanItems.length) {
     container.innerHTML = `
@@ -3177,6 +4138,7 @@ function renderList() {
   stops.forEach(s => {
     if (!visibleTypes.has(s.type || 'other')) return; // skip stops excluded by type filter
     if (!prioFilterMatch(s)) return;                  // skip stops excluded by priority filter
+    if (!tagFilterMatch(s)) return;                   // skip stops excluded by tag filter
     const start = s.day || 0;
     const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
     for (let d = start; d <= end; d++) (byDay[d] = byDay[d] || []).push(s);
@@ -3202,7 +4164,7 @@ function renderList() {
           const daysStr = si.startDay === si.endDay ? `Day ${si.startDay}` : `Days ${si.startDay}–${si.endDay}`;
           const times   = [si.checkIn, si.checkOut].filter(Boolean).join(' – ');
           const costStr = si.cost != null ? `<span class="span-cost-badge">${si.currency ? si.currency + '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>` : '';
-          return `<div class="day-booking-card" onclick="editBooking(${si.id})">
+          return `<div class="day-booking-card" onclick="openBookingCard(${si.id})">
             <div class="day-booking-top">
               <span class="day-booking-dot" style="background:${color}"></span>
               <span class="day-booking-name">${esc(si.name)}</span>
@@ -3214,6 +4176,7 @@ function renderList() {
               ${costStr}
             </div>
             ${si.notes ? `<div class="md-content" style="font-size:.71rem;margin-top:4px;opacity:.75">${renderMarkdown(si.notes)}</div>` : ''}
+            ${renderTagChipsHtml(si.tags)}
           </div>`;
         }).join('');
       container.appendChild(banner);
@@ -3261,7 +4224,9 @@ function renderList() {
 
       const isStartDay = (s.day || 0) === day;
       const card = document.createElement('div');
-      card.className = 'stop-item' + (isStartDay ? '' : ' stop-item--continuation');
+      card.className = 'stop-item'
+        + (isStartDay ? '' : ' stop-item--continuation')
+        + (s.hidden   ? ' stop-item--hidden' : '');
       card.dataset.id = s.id;
       if (!isStartDay) card.dataset.noDrag = '1';
       card.innerHTML = `
@@ -3287,6 +4252,7 @@ function renderList() {
               </span>` : ''}
               ${bkBadge}
             </div>
+            ${renderTagChipsHtml(s.tags)}
           </div>
           <div class="stop-actions">
             <button class="btn-icon move" title="Move up" onclick="moveStop(${s.id},-1)">
@@ -3308,7 +4274,23 @@ function renderList() {
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
               </svg>
             </button>
-            <button class="btn-icon" title="Show on map" onclick="focusStop(${s.id})">
+            <button class="btn-icon ${s.hidden ? 'vis-off' : ''}"
+                    title="${s.hidden ? 'Hidden from map – click to show' : 'Shown on map – click to hide'}"
+                    onclick="toggleStopVisibility(${s.id})">
+              ${s.hidden
+                ? `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                     <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+                     <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+                     <line x1="1" y1="1" x2="23" y2="23"/>
+                   </svg>`
+                : `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                     <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                     <circle cx="12" cy="12" r="3"/>
+                   </svg>`}
+            </button>
+            <button class="btn-icon" title="Focus on map" onclick="focusStop(${s.id})">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="10" r="3"/>
@@ -3326,7 +4308,13 @@ function renderList() {
         </div>
         ${s.notes    ? `<div class="stop-notes-preview md-content">${renderMarkdown(s.notes)}</div>` : ''}
         ${s.photoUrl ? `<img class="stop-photo-thumb" src="${esc(s.photoUrl)}" alt=""
-                            onerror="this.style.display='none'" />` : ''}`;
+                            onerror="this.style.display='none'" />` : ''}
+        ${renderPlaceCardHtml(s)}`;
+      card.style.cursor = 'pointer';
+      card.onclick = (e) => {
+        if (e.target.closest('.stop-actions')) return;
+        openStopCard(s.id);
+      };
       groupEl.appendChild(card);
 
       // Leg connector to the next stop in route order
@@ -3428,7 +4416,7 @@ async function updateMap() {
 
   const visibleRoute = route.filter(s => {
     if (s._isVirtual) return dayFilterMatch(s);
-    return visibleTypes.has(s.type || 'other') && dayFilterMatch(s) && prioFilterMatch(s);
+    return visibleTypes.has(s.type || 'other') && dayFilterMatch(s) && prioFilterMatch(s) && tagFilterMatch(s) && !s.hidden;
   });
   const coords       = [];
 
@@ -3467,7 +4455,7 @@ async function updateMap() {
       const si = spanItems.find(x => x.id === s._spanId);
       if (!si) return;
       const m = L.marker([si.lat, si.lng], { icon: spanPinIcon(si) })
-        .bindPopup(spanPopupHtml(si), { maxWidth: 240 })
+        .on('click', () => openBookingCard(si.id))
         .addTo(map);
       markerMap[mapKey] = m;
       coords.push([si.lat, si.lng]);
@@ -3510,7 +4498,7 @@ async function updateMap() {
       </div>`;
 
     const marker = L.marker([s.lat, s.lng], { icon: pinIcon(s.type, s.day, s.photoUrl, s.startTime, s.endTime) })
-      .bindPopup(popup, { maxWidth: 260 });
+      .on('click', () => openStopCard(s.id));
     if (markerOptions.name)
       marker.bindTooltip(s.name, { permanent: true, direction: 'bottom', className: 'map-label', offset: [0, 4] });
     marker.addTo(map);
@@ -3536,7 +4524,7 @@ async function updateMap() {
            .some(d => activeDayFilter.has(d));
     if (!inDay) return;
     const m = L.marker([si.lat, si.lng], { icon: spanPinIcon(si) })
-      .bindPopup(spanPopupHtml(si), { maxWidth: 240 })
+      .on('click', () => openBookingCard(si.id))
       .addTo(map);
     markerMap[mapKey] = m;
     coords.push([si.lat, si.lng]);
@@ -3709,9 +4697,10 @@ function toggleFilterBar() {
   document.getElementById('filter-bar').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('filter-chips').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('priority-filter-section').classList.toggle('collapsed', !filterBarOpen);
+  document.getElementById('tag-filter-section').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('day-filter-section').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('btn-filter-chevron').classList.toggle('open', filterBarOpen);
-  if (filterBarOpen) renderPriorityFilter();
+  if (filterBarOpen) { renderPriorityFilter(); renderTagFilter(); }
 }
 
 function renderDayFilter() {
@@ -3823,6 +4812,141 @@ function clearPriorityFilter() {
   renderList();
 }
 
+// ─── Tag helpers ──────────────────────────────────────────────────────
+function getAllTags() {
+  const set = new Set();
+  stops.forEach(s => (s.tags || []).forEach(t => set.add(t)));
+  spanItems.forEach(si => (si.tags || []).forEach(t => set.add(t)));
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+function _tagsFor(ctx)   { return ctx === 'stop' ? _stopFormTags : _bkFormTags; }
+function _inputId(ctx)   { return ctx === 'stop' ? 'stop-tags-input'   : 'bk-tags-input'; }
+function _chipsId(ctx)   { return ctx === 'stop' ? 'stop-tags-chips'   : 'bk-tags-chips'; }
+function _suggestId(ctx) { return ctx === 'stop' ? 'stop-tags-suggest' : 'bk-tags-suggest'; }
+
+function focusTagInput(ctx) {
+  document.getElementById(_inputId(ctx))?.focus();
+}
+
+function renderFormTags(ctx) {
+  const tags  = _tagsFor(ctx);
+  const chips = document.getElementById(_chipsId(ctx));
+  const input = document.getElementById(_inputId(ctx));
+  if (!chips || !input) return;
+  [...chips.querySelectorAll('.tag-chip-input')].forEach(el => el.remove());
+  tags.forEach((tag, i) => {
+    const chip = document.createElement('span');
+    chip.className = 'tag-chip-input';
+    chip.innerHTML = `${esc(tag)}<span class="tag-chip-x" onmousedown="event.preventDefault();removeTagFromForm('${ctx}',${i})">&#x00D7;</span>`;
+    chips.insertBefore(chip, input);
+  });
+}
+
+function addTagToForm(ctx, tag) {
+  tag = tag.trim().toLowerCase().replace(/,/g, '');
+  if (!tag) return;
+  const tags = _tagsFor(ctx);
+  if (!tags.includes(tag)) tags.push(tag);
+  renderFormTags(ctx);
+  const inp = document.getElementById(_inputId(ctx));
+  if (inp) inp.value = '';
+  hideTagSuggestions(ctx);
+}
+
+function removeTagFromForm(ctx, idx) {
+  _tagsFor(ctx).splice(idx, 1);
+  renderFormTags(ctx);
+}
+
+function onTagInput(ctx) {
+  const inp = document.getElementById(_inputId(ctx));
+  if (!inp) return;
+  const val = inp.value.trim().toLowerCase();
+  const existing = getAllTags().filter(t =>
+    !_tagsFor(ctx).includes(t) && (val ? t.includes(val) : true)
+  );
+  if (existing.length && (val || _tagsFor(ctx).length === 0)) {
+    showTagSuggestions(ctx, existing.slice(0, 8));
+  } else {
+    hideTagSuggestions(ctx);
+  }
+}
+
+function onTagKeyDown(e, ctx) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const val = document.getElementById(_inputId(ctx))?.value;
+    if (val && val.trim()) addTagToForm(ctx, val);
+  } else if (e.key === 'Backspace') {
+    const inp = document.getElementById(_inputId(ctx));
+    if (inp && inp.value === '') {
+      const tags = _tagsFor(ctx);
+      if (tags.length) { tags.pop(); renderFormTags(ctx); }
+    }
+  }
+}
+
+function showTagSuggestions(ctx, tags) {
+  const el = document.getElementById(_suggestId(ctx));
+  if (!el) return;
+  el.innerHTML = tags.map(t =>
+    `<div class="tag-suggest-item" onmousedown="event.preventDefault();addTagToForm('${ctx}','${t.replace(/'/g, "\\'")}')">${esc(t)}</div>`
+  ).join('');
+  el.style.display = 'block';
+}
+
+function hideTagSuggestions(ctx) {
+  const el = document.getElementById(_suggestId(ctx));
+  if (el) el.style.display = 'none';
+}
+
+// ── Tag filter ─────────────────────────────────────────────────
+function tagFilterMatch(item) {
+  if (activeTagFilter.size === 0) return true;
+  const tags = item.tags || [];
+  return [...activeTagFilter].some(t => tags.includes(t));
+}
+
+function renderTagFilter() {
+  const sec = document.getElementById('tag-filter-section');
+  if (!sec) return;
+  const allTags = getAllTags();
+  sec.style.display = allTags.length ? '' : 'none';
+  if (!allTags.length) { activeTagFilter.clear(); return; }
+  const anyActive = activeTagFilter.size > 0;
+  sec.innerHTML =
+    `<span class="filter-label">Tags</span>` +
+    allTags.map(t => {
+      const on = activeTagFilter.has(t);
+      return `<span class="tag-filter-chip${on ? ' active' : ''}"
+                    onclick="toggleTagFilter('${t.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+                ${esc(t)}
+              </span>`;
+    }).join('') +
+    (anyActive
+      ? `<span class="filter-chip filter-chip--clear" onclick="clearTagFilter()">&#x2715; Clear</span>`
+      : '');
+}
+
+function toggleTagFilter(tag) {
+  activeTagFilter.has(tag) ? activeTagFilter.delete(tag) : activeTagFilter.add(tag);
+  renderTagFilter();
+  updateMap(); renderList();
+}
+
+function clearTagFilter() {
+  activeTagFilter.clear();
+  renderTagFilter();
+  updateMap(); renderList();
+}
+
+// Helper: tag chips HTML for card/booking display
+function renderTagChipsHtml(tags) {
+  if (!tags || !tags.length) return '';
+  return `<div class="stop-tags">${tags.map(t => `<span class="tag-chip-display">${esc(t)}</span>`).join('')}</div>`;
+}
+
 // ─── Driving mode toggle ──────────────────────────────────────────────
 function toggleDrivingMode() {
   drivingMode = !drivingMode;
@@ -3838,14 +4962,84 @@ function toggleDrivingMode() {
 }
 
 // ─── Sidebar collapse ─────────────────────────────────────────────────
+function _setSidebarW(px) {
+  document.documentElement.style.setProperty('--sidebar-w', px + 'px');
+}
+
 function toggleSidebar() {
   sidebarCollapsed = !sidebarCollapsed;
-  document.querySelector('.sidebar').classList.toggle('collapsed', sidebarCollapsed);
+  const sb     = document.querySelector('.sidebar');
   const handle = document.getElementById('sidebar-handle');
-  handle.title = sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar';
-  // let the CSS transition finish before telling Leaflet to resize
+  sb.classList.toggle('collapsed', sidebarCollapsed);
+  if (sidebarCollapsed) {
+    document.documentElement.style.setProperty('--sidebar-w', '0px');
+  } else {
+    _setSidebarW(_sidebarW || 390);
+  }
+  handle.title = sidebarCollapsed
+    ? 'Click to expand · Drag to resize'
+    : 'Drag to resize · Click to collapse';
   setTimeout(() => map && map.invalidateSize(), 300);
 }
+
+// ─── Sidebar drag-to-resize ────────────────────────────────────────────
+let _sidebarW = 390;
+(function initSidebarResize() {
+  // Restore saved width
+  try {
+    const saved = parseInt(localStorage.getItem('sidebarW'), 10);
+    if (saved >= 220 && saved <= 900) _sidebarW = saved;
+  } catch (e) {}
+
+  const sb     = document.querySelector('.sidebar');
+  const handle = document.getElementById('sidebar-handle');
+  const MIN_W  = 220, MAX_W = 760;
+
+  // Apply saved width immediately
+  if (!sidebarCollapsed) _setSidebarW(_sidebarW);
+
+  let startX, startW, didDrag;
+
+  handle.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    startX  = e.clientX;
+    startW  = sb.offsetWidth;
+    didDrag = false;
+    sb.style.transition        = 'none';   // disable animation while dragging
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+  });
+
+  handle.addEventListener('pointermove', e => {
+    if (!handle.hasPointerCapture(e.pointerId)) return;
+    const dx = e.clientX - startX;
+    if (Math.abs(dx) > 4) didDrag = true;
+    if (didDrag) {
+      const newW = Math.min(MAX_W, Math.max(MIN_W, startW + dx));
+      _sidebarW = newW;
+      _setSidebarW(newW);
+      if (sidebarCollapsed) {
+        sidebarCollapsed = false;
+        sb.classList.remove('collapsed');
+      }
+    }
+  });
+
+  handle.addEventListener('pointerup', e => {
+    handle.releasePointerCapture(e.pointerId);
+    sb.style.transition            = '';
+    document.body.style.cursor     = '';
+    document.body.style.userSelect = '';
+    if (didDrag) {
+      try { localStorage.setItem('sidebarW', _sidebarW); } catch (e) {}
+      map && map.invalidateSize();
+    } else {
+      toggleSidebar();   // short click = collapse/expand
+    }
+  });
+})();
 
 // ─── Mobile map / planning view toggle ────────────────────────────────
 const _MAP_ICON  = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -4003,16 +5197,20 @@ function setBkStatus(type, text) {
 function clearBkStatus() { document.getElementById('bk-status-msg').className = 'status-msg'; }
 
 function clearBookingForm() {
-  document.getElementById('bk-name').value      = '';
-  document.getElementById('bk-type').value      = 'accommodation';
-  document.getElementById('bk-start-day').value = 1;
-  document.getElementById('bk-end-day').value   = 1;
-  document.getElementById('bk-checkin').value   = '';
-  document.getElementById('bk-checkout').value  = '';
-  document.getElementById('bk-cost').value      = '';
-  document.getElementById('bk-currency').value  = 'EUR';
-  document.getElementById('bk-maps').value      = '';
-  document.getElementById('bk-notes').value     = '';
+  document.getElementById('bk-name').value        = '';
+  document.getElementById('bk-type').value        = 'accommodation';
+  document.getElementById('bk-start-day').value   = 1;
+  document.getElementById('bk-end-day').value     = 1;
+  document.getElementById('bk-checkin').value     = '';
+  document.getElementById('bk-checkout').value    = '';
+  document.getElementById('bk-cancel-by').value   = '';
+  document.getElementById('bk-cost').value        = '';
+  document.getElementById('bk-currency').value    = 'EUR';
+  document.getElementById('bk-booking-url').value = '';
+  document.getElementById('bk-maps').value        = '';
+  document.getElementById('bk-notes').value       = '';
+  _bkFormTags = [];
+  renderFormTags('bk');
   clearBkStatus();
 }
 
@@ -4021,12 +5219,15 @@ async function addBooking() {
   const type     = document.getElementById('bk-type').value;
   const startDay = Math.max(1, parseInt(document.getElementById('bk-start-day').value) || 1);
   const endDay   = Math.max(startDay, parseInt(document.getElementById('bk-end-day').value) || startDay);
-  const checkIn  = document.getElementById('bk-checkin').value;
-  const checkOut = document.getElementById('bk-checkout').value;
-  const mapsUrl  = document.getElementById('bk-maps').value.trim();
-  const notes    = document.getElementById('bk-notes').value.trim();
-  const cost     = parseFloat(document.getElementById('bk-cost').value) || null;
-  const currency = document.getElementById('bk-currency').value.trim().toUpperCase() || '';
+  const checkIn    = document.getElementById('bk-checkin').value;
+  const checkOut   = document.getElementById('bk-checkout').value;
+  const cancelBy   = document.getElementById('bk-cancel-by').value   || '';
+  const mapsUrl    = document.getElementById('bk-maps').value.trim();
+  const notes      = document.getElementById('bk-notes').value.trim();
+  const cost       = parseFloat(document.getElementById('bk-cost').value) || null;
+  const currency   = document.getElementById('bk-currency').value.trim().toUpperCase() || '';
+  const bookingUrl = document.getElementById('bk-booking-url').value.trim();
+  const tags       = [..._bkFormTags];
   const btn      = document.getElementById('btn-booking-add');
 
   if (!name) { document.getElementById('bk-name').focus(); return; }
@@ -4057,14 +5258,17 @@ async function addBooking() {
   }
 
   const item = { name, type, startDay, endDay, checkIn, checkOut,
-                 mapsUrl, lat, lng, notes, cost, currency };
+                 cancelBy: cancelBy || undefined,
+                 mapsUrl, lat, lng, notes, cost, currency,
+                 bookingUrl: bookingUrl || undefined,
+                 tags: tags.length ? tags : undefined };
 
   if (editingSpanId !== null) {
     const idx = spanItems.findIndex(s => s.id === editingSpanId);
     if (idx !== -1) spanItems[idx] = { ...spanItems[idx], ...item };
     editingSpanId = null;
-    document.getElementById('btn-booking-add').textContent       = '+ Add Booking';
-    document.getElementById('btn-booking-cancel').style.display  = 'none';
+    document.getElementById('btn-booking-add').textContent      = '+ Add Booking';
+    document.getElementById('btn-booking-cancel').textContent   = '← Back';
   } else {
     spanItems.push({ id: Date.now(), ...item });
   }
@@ -4078,19 +5282,23 @@ async function addBooking() {
 function editBooking(id) {
   const si = spanItems.find(s => s.id === id);
   if (!si) return;
-  document.getElementById('bk-name').value      = si.name      || '';
-  document.getElementById('bk-type').value      = si.type      || 'accommodation';
-  document.getElementById('bk-start-day').value = si.startDay  || 1;
-  document.getElementById('bk-end-day').value   = si.endDay    || si.startDay || 1;
-  document.getElementById('bk-checkin').value   = si.checkIn   || '';
-  document.getElementById('bk-checkout').value  = si.checkOut  || '';
-  document.getElementById('bk-cost').value      = si.cost     ?? '';
-  document.getElementById('bk-currency').value  = si.currency || '';
-  document.getElementById('bk-maps').value      = si.mapsUrl   || '';
-  document.getElementById('bk-notes').value     = si.notes     || '';
+  document.getElementById('bk-name').value        = si.name       || '';
+  document.getElementById('bk-type').value        = si.type       || 'accommodation';
+  document.getElementById('bk-start-day').value   = si.startDay   || 1;
+  document.getElementById('bk-end-day').value     = si.endDay     || si.startDay || 1;
+  document.getElementById('bk-checkin').value     = si.checkIn    || '';
+  document.getElementById('bk-checkout').value    = si.checkOut   || '';
+  document.getElementById('bk-cancel-by').value   = si.cancelBy   || '';
+  document.getElementById('bk-cost').value        = si.cost      ?? '';
+  document.getElementById('bk-currency').value    = si.currency   || '';
+  document.getElementById('bk-booking-url').value = si.bookingUrl || '';
+  document.getElementById('bk-maps').value        = si.mapsUrl    || '';
+  document.getElementById('bk-notes').value       = si.notes      || '';
+  _bkFormTags = [...(si.tags || [])];
+  renderFormTags('bk');
   editingSpanId = id;
-  document.getElementById('btn-booking-add').textContent      = '✓ Save Booking';
-  document.getElementById('btn-booking-cancel').style.display = 'block';
+  document.getElementById('btn-booking-add').textContent     = '✓ Save Booking';
+  document.getElementById('btn-booking-cancel').textContent  = '× Cancel edit';
   clearBkStatus();
   showTab('bookings');
   document.getElementById('bk-name').focus();
@@ -4098,8 +5306,8 @@ function editBooking(id) {
 
 function cancelBookingEdit() {
   editingSpanId = null;
-  document.getElementById('btn-booking-add').textContent      = '+ Add Booking';
-  document.getElementById('btn-booking-cancel').style.display = 'none';
+  document.getElementById('btn-booking-add').textContent     = '+ Add Booking';
+  document.getElementById('btn-booking-cancel').textContent  = '← Back';
   clearBookingForm();
   showTab('list');
 }
@@ -4108,6 +5316,7 @@ function deleteBooking(id) {
   spanItems = spanItems.filter(s => s.id !== id);
   save();
   renderBookings();
+  renderNavPanel();
   updateMap();
   renderList();
 }
@@ -4132,6 +5341,11 @@ function renderBookings() {
     const div = document.createElement('div');
     div.className = 'span-item';
     div.dataset.id = si.id;
+    div.style.cursor = 'pointer';
+    div.onclick = (e) => {
+      if (e.target.closest('.span-item-actions')) return;
+      openBookingCard(si.id);
+    };
     div.innerHTML = `
       <div class="span-item-top">
         <span class="span-item-dot" style="background:${color}"></span>
@@ -4144,7 +5358,8 @@ function renderBookings() {
               <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
             </svg>
           </button>
-          <button class="btn-icon del" title="Delete" onclick="deleteBooking(${si.id})">
+          <button class="btn-icon del" title="Delete"
+                  onclick="if(confirm('Delete this booking?'))deleteBooking(${si.id})">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                  stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
               <polyline points="3 6 5 6 21 6"/>
@@ -4161,7 +5376,15 @@ function renderBookings() {
         ${si.lat ? `<span style="color:rgba(247,255,246,.3)">📍</span>` : ''}
         ${si.cost != null ? `<span class="span-cost-badge">${si.currency ? si.currency + '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}</span>` : ''}
       </div>
-      ${si.notes ? `<div class="md-content" style="font-size:.7rem;color:rgba(247,255,246,.38);margin-top:1px">${renderMarkdown(si.notes)}</div>` : ''}`;
+      ${si.notes ? `<div class="md-content" style="font-size:.7rem;color:rgba(247,255,246,.38);margin-top:1px">${renderMarkdown(si.notes)}</div>` : ''}
+      ${renderTagChipsHtml(si.tags)}
+      ${_cancelChipHtml(si.cancelBy)}
+      ${si.bookingUrl ? (() => {
+          const p = detectBookingPlatform(si.bookingUrl);
+          return `<div style="margin-top:4px"><a href="${esc(si.bookingUrl)}" target="_blank" rel="noopener"
+            style="font-size:.67rem;color:#03B5AA;text-decoration:none;display:inline-flex;align-items:center;gap:3px"
+            onclick="event.stopPropagation()">${p.icon} ${p.name} ↗</a></div>`;
+        })() : ''}`;
     listEl.appendChild(div);
   });
 
@@ -4223,7 +5446,7 @@ function renderDaysNav() {
     <div class="nav-day-header-row" onclick="selectNavDay(0)">
       <svg class="nav-day-chevron${allActive ? ' open' : ''}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       <span class="nav-day-label">All days</span>
-      <span class="nav-day-count">${stops.filter(s => visibleTypes.has(s.type || 'other') && prioFilterMatch(s)).length}</span>
+      <span class="nav-day-count">${stops.filter(s => visibleTypes.has(s.type || 'other') && prioFilterMatch(s) && tagFilterMatch(s)).length}</span>
     </div>
   </div>`;
 
@@ -4235,6 +5458,7 @@ function renderDaysNav() {
     const dayStopsAll = stops.filter(s => {
       if (!visibleTypes.has(s.type || 'other')) return false;
       if (!prioFilterMatch(s)) return false;
+      if (!tagFilterMatch(s)) return false;
       const start = s.day || 0;
       const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
       return d >= start && d <= end;
@@ -4304,12 +5528,20 @@ function renderBookingsNav() {
     const color   = SPAN_TYPES[si.type]?.color || '#94A3B8';
     const daysStr = si.startDay === si.endDay ? `D${si.startDay}` : `D${si.startDay}–${si.endDay}`;
     const costStr = si.cost != null ? ` · ${si.currency || ''}${si.currency ? '\u202F' : ''}${si.cost.toLocaleString('en', {minimumFractionDigits:2, maximumFractionDigits:2})}` : '';
-    return `<div class="nav-booking-item" onclick="editBooking(${si.id})">
+    return `<div class="nav-booking-item" onclick="if(!event.target.closest('.nav-booking-del'))editBooking(${si.id})">
       <span class="nav-booking-dot" style="background:${color}"></span>
       <div class="nav-booking-info">
         <span class="nav-booking-name">${esc(si.name)}</span>
         <span class="nav-booking-meta">${daysStr}${costStr}</span>
       </div>
+      <button class="nav-booking-del" title="Delete booking"
+              onclick="event.stopPropagation();if(confirm('Delete \u201c${esc(si.name)}\u201d?'))deleteBooking(${si.id})">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="3 6 5 6 21 6"/>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+        </svg>
+      </button>
     </div>`;
   }).join('');
 }
@@ -4370,8 +5602,8 @@ function selectPriority(n) {
 
 function clearStopForm() {
   editingId = null;
-  document.getElementById('btn-add').textContent           = '+ Add Stop';
-  document.getElementById('btn-cancel-edit').style.display = 'none';
+  document.getElementById('btn-add').textContent          = '+ Add Stop';
+  document.getElementById('btn-cancel-edit').textContent  = '← Back';
   document.getElementById('inp-name').value    = '';
   document.getElementById('inp-maps').value    = '';
   document.getElementById('inp-loc-search').value = '';
@@ -4384,6 +5616,8 @@ function clearStopForm() {
   document.getElementById('inp-end-day').value = 1;
   document.getElementById('inp-booking-ref').value = '';
   selectPriority(1);
+  _stopFormTags = [];
+  renderFormTags('stop');
   renderBookingRefSelect();
   clearStatus();
 }
@@ -4788,6 +6022,62 @@ renderSyncBtn(githubSettings.pat ? 'idle' : 'unconfigured');
           Go to <em>github.com/settings/tokens → Generate new token (classic)</em>. Check the ☑ <em>repo</em> scope. Copy the token (shown only once).</p>
         <p><strong>6. Configure sync here</strong><br>
           Paste your token above, enter your GitHub username and the data repo name, then click <em>Save &amp; close</em>. Hit the ☁ button in the toolbar to sync.</p>
+      </div>
+    </details>
+  </div>
+</div>
+
+<!-- ── Detail Card Modal ─────────────────────────────────────── -->
+<div class="detail-modal-bg hidden" id="detail-modal"
+     onclick="if(event.target===this)closeDetailModal()">
+  <div class="detail-modal" id="detail-modal-inner">
+    <!-- populated dynamically -->
+  </div>
+</div>
+
+<!-- ── Google Places API Settings Modal ──────────────────────── -->
+<div class="gh-modal-bg hidden" id="gp-modal-bg" onclick="if(event.target===this)closeGpModal()">
+  <div class="gh-modal" role="dialog" aria-modal="true" aria-labelledby="gp-modal-title">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <h2 id="gp-modal-title" style="margin:0;font-size:1rem;color:#F7FFF6;font-weight:700">
+        🌐 Google Places API
+      </h2>
+      <button class="btn-gh-close" onclick="closeGpModal()" title="Close">✕</button>
+    </div>
+
+    <!-- Shown only when key is loaded from config.js -->
+    <div id="gp-config-notice" style="display:none;margin-bottom:12px;padding:8px 10px;
+         background:rgba(3,181,170,.1);border:1px solid rgba(3,181,170,.3);border-radius:8px;
+         font-size:.72rem;color:rgba(247,255,246,.7);line-height:1.5">
+      ✅ API key is loaded from <code style="background:rgba(247,255,246,.08);padding:1px 5px;border-radius:4px">config.js</code>
+      — edit that file to change it.
+    </div>
+
+    <div class="gh-form-group">
+      <label class="gh-label" for="gp-api-key">API Key</label>
+      <input class="gh-input" id="gp-api-key" type="password"
+             placeholder="AIzaSy…" autocomplete="off" spellcheck="false"/>
+    </div>
+
+    <div class="gh-modal-actions">
+      <button class="btn-gh-test" onclick="testGpKey()">Test key</button>
+      <button class="btn-gh-save" onclick="saveGpKey()">Save &amp; close</button>
+    </div>
+
+    <details class="gh-setup-guide">
+      <summary>Setup guide</summary>
+      <div class="gh-setup-body">
+        <p><strong>1. Enable the Places API (New)</strong><br>
+          Go to <a href="https://console.cloud.google.com/apis/library/places-backend.googleapis.com" target="_blank" rel="noopener" style="color:#03B5AA">Google Cloud Console → APIs &amp; Services</a> and enable <em>Places API (New)</em>.</p>
+        <p><strong>2. Create &amp; restrict an API key</strong><br>
+          In <em>APIs &amp; Services → Credentials</em>, click <em>Create Credentials → API key</em>.<br>
+          Then open the key and under <em>Application restrictions</em> choose <strong>HTTP referrers</strong> and add your GitHub Pages domain:
+          <code style="display:block;margin:5px 0;padding:4px 8px;background:rgba(247,255,246,.06);border-radius:5px;font-size:.7rem">https://&lt;your-username&gt;.github.io/*</code>
+          This means the key only works from your site — even if someone sees it in the source.</p>
+        <p><strong>3. Add the key to config.js</strong><br>
+          Copy <code>config.example.js</code> → <code>config.js</code>, paste your key inside, and commit it to the repo. The app loads it automatically.</p>
+        <p><strong>Or: save it in this browser only (no file needed)</strong><br>
+          Paste the key above and click <em>Save &amp; close</em> — stored in this browser's localStorage only.</p>
       </div>
     </details>
   </div>
