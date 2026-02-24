@@ -7,5 +7,5 @@
 //   → Add: https://<your-username>.github.io/*
 
 window.APP_CONFIG = {
-  googlePlacesApiKey: '',   // e.g. 'AIzaSyABC123...'
+  googlePlacesApiKey: 'AIzaSyDgRKDMI4rHFYMAFXdRVccAlTqDh7PCscQ',   // e.g. 'AIzaSyABC123...'
 };
