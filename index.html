@@ -198,6 +198,40 @@
       margin-top: 3px;
       line-height: 1.45;
     }
+    /* ── Location search ─────────────────────────────────────── */
+    .loc-search-row { display: flex; gap: 4px; margin-bottom: 4px; }
+    .loc-search-row input { flex: 1; }
+    .btn-loc-search {
+      padding: 0 10px; background: rgba(3,181,170,.15);
+      border: 1px solid rgba(3,181,170,.3); color: #03B5AA;
+      border-radius: 6px; cursor: pointer; font-size: .82rem; font-weight: 600;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .btn-loc-search:hover { background: rgba(3,181,170,.28); }
+    .loc-search-results {
+      background: #1f262d; border: 1px solid rgba(247,255,246,.12);
+      border-radius: 7px; max-height: 200px; overflow-y: auto;
+      margin-bottom: 4px; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+    }
+    .loc-result-item {
+      padding: 7px 10px; cursor: pointer; font-size: .77rem;
+      color: rgba(247,255,246,.75); border-bottom: 1px solid rgba(247,255,246,.06);
+      transition: background .1s;
+    }
+    .loc-result-item:last-child { border-bottom: none; }
+    .loc-result-item:hover, .loc-result-item.focused {
+      background: rgba(3,181,170,.14); color: #F7FFF6;
+    }
+    .loc-result-name    { font-weight: 600; display: block; }
+    .loc-result-address { font-size: .68rem; color: rgba(247,255,246,.38); display: block; margin-top: 1px; }
+    .loc-or-divider {
+      font-size: .65rem; color: rgba(247,255,246,.28); text-align: center;
+      margin: 5px 0; letter-spacing: .06em; text-transform: uppercase;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .loc-or-divider::before, .loc-or-divider::after {
+      content: ''; flex: 1; height: 1px; background: rgba(247,255,246,.1);
+    }
 
     .status-msg {
       display: none;
@@ -454,6 +488,38 @@
     .tl-block       { cursor: grab; touch-action: none; user-select: none; }
     .tl-block--dragging { z-index: 10; opacity: .88; cursor: grabbing !important;
       box-shadow: 0 6px 20px rgba(0,0,0,.5) !important; transition: none !important; }
+    .tl-block--continuation { opacity: .65; border-style: dashed; cursor: default; }
+    .tl-block--continuation .tl-block-edit { display: none !important; }
+    .tl-block--multiday-start { border-bottom: 2px dashed rgba(247,255,246,.25); }
+    .tl-block--multiday-end   { border-top:    2px dashed rgba(247,255,246,.25); }
+    /* Narrow blocks when 2+ stops overlap in time */
+    .tl-block--narrow { padding: 4px 5px; }
+    .tl-block--narrow .tl-block-name { font-size: .70rem; }
+    .tl-block--narrow .tl-block-time { font-size: .58rem; }
+    .tl-block--narrow .tl-block-booking { display: none; }
+    .tl-block-continues {
+      position: absolute; bottom: 4px; left: 0; right: 0;
+      text-align: center; font-size: .58rem; font-weight: 600; letter-spacing: .02em;
+      color: rgba(247,255,246,.45); pointer-events: none;
+    }
+    .tl-block-started {
+      font-size: .58rem; font-weight: 600; color: rgba(247,255,246,.45);
+      margin-bottom: 2px; letter-spacing: .02em;
+    }
+    /* Mid-day continuation band */
+    .tl-cont-band {
+      display: flex; align-items: center; gap: 8px;
+      border-left: 3px solid; border-radius: 7px;
+      padding: 7px 10px; margin: 4px 10px 2px;
+      position: relative;
+    }
+    .tl-cont-band:hover .tl-block-edit { display: flex; }
+    .tl-cont-band-icon  { flex-shrink: 0; display: flex; align-items: center; }
+    .tl-cont-band-info  { flex: 1; min-width: 0; }
+    .tl-cont-band-name  { font-size: .8rem; font-weight: 700; color: #F7FFF6;
+                          display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tl-cont-band-meta  { font-size: .67rem; color: rgba(247,255,246,.4);
+                          display: flex; align-items: center; gap: 4px; margin-top: 2px; }
 
     .tl-drive-block {
       position: absolute; left: 6px; right: 6px;
@@ -504,6 +570,9 @@
     .tl-mini-card:hover .tl-block-edit { display: flex; }
     .tl-mini-card-name { font-size: .8rem; font-weight: 700; color: #F7FFF6; }
     .tl-mini-card-meta { font-size: .67rem; color: rgba(247,255,246,.4); margin-top: 2px; }
+    .tl-mini-card--continuation { opacity: .65; border-style: dashed; cursor: default; }
+    .tl-mini-card--continuation .tl-block-edit { display: none !important; }
+    .tl-mini-card--multiday { border-bottom-style: dashed; }
 
     .stop-notes-preview {
       font-size: .79rem;
@@ -1075,6 +1144,8 @@
     .nav-booking-inline .nav-stop-name { color: rgba(247,255,246,.55); }
     .nav-stop-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
     .nav-stop-days { font-size: .61rem; flex-shrink: 0; }
+    .nav-stop-item--cont { opacity: .55; border-left: 2px dashed rgba(247,255,246,.15); padding-left: 20px; }
+    .nav-stop-item--cont .nav-stop-name { font-style: italic; }
     /* Booking items in nav */
     .nav-booking-item {
       display: flex; align-items: center; gap: 8px;
@@ -1129,6 +1200,40 @@
       display: flex; align-items: center; gap: 5px; flex-wrap: wrap;
       font-size: .67rem; color: rgba(247,255,246,.4); padding-left: 15px;
     }
+
+    /* ── Multi-day stop badges ───────────────────────────────── */
+    .stop-day-range-badge {
+      display: inline-flex; align-items: center; gap: 3px;
+      background: rgba(162,159,21,.18); color: #A29F15;
+      font-size: .64rem; font-weight: 700;
+      padding: 2px 6px; border-radius: 10px; white-space: nowrap;
+    }
+    .stop-item--continuation { opacity: .72; border-style: dashed; cursor: default; }
+    .stop-item--continuation .stop-actions .btn-icon.move { display: none; }
+
+    /* ── Priority badge (cards + timeline) ──────────────────────────── */
+    .prio-badge {
+      display: inline-flex; align-items: center;
+      font-size: .62rem; font-weight: 700; padding: 2px 6px;
+      border-radius: 8px; white-space: nowrap; letter-spacing: .03em;
+    }
+    .prio-badge--1 { background: rgba(255,71,87,.14);   color: #FF4757; }
+    .prio-badge--2 { background: rgba(255,159,67,.14);  color: #FF9F43; }
+    .prio-badge--3 { background: rgba(116,125,140,.14); color: #8A9099; }
+
+    /* ── Priority selector (add/edit form) ──────────────────────────── */
+    .priority-selector { display: flex; gap: 4px; }
+    .prio-btn {
+      flex: 1; padding: 6px 4px; border-radius: 6px;
+      border: 1.5px solid rgba(247,255,246,.1);
+      background: rgba(247,255,246,.04); color: rgba(247,255,246,.38);
+      font-size: .67rem; font-weight: 700; cursor: pointer; text-align: center;
+      transition: background .15s, color .15s, border-color .15s; white-space: nowrap;
+    }
+    .prio-btn:hover { background: rgba(247,255,246,.08); color: rgba(247,255,246,.65); }
+    .prio-btn--1.prio-active { background: rgba(255,71,87,.16);   color: #FF4757; border-color: rgba(255,71,87,.4); }
+    .prio-btn--2.prio-active { background: rgba(255,159,67,.16);  color: #FF9F43; border-color: rgba(255,159,67,.4); }
+    .prio-btn--3.prio-active { background: rgba(116,125,140,.16); color: #A0A8B0; border-color: rgba(116,125,140,.4); }
 
     /* ── Desktop: hide tabs bar; hide booking list (moved to nav) */
     .tabs { display: none; }
@@ -1321,6 +1426,9 @@
       <div class="filter-chips collapsed" id="filter-chips">
         <!-- populated by renderFilterBar() -->
       </div>
+      <div class="filter-chips collapsed" id="priority-filter-section">
+        <!-- populated by renderPriorityFilter() -->
+      </div>
       <div class="filter-chips" id="day-filter-section" style="display:none">
         <!-- populated by renderDayFilter() -->
       </div>
@@ -1338,14 +1446,31 @@
     <div class="form-panel hidden" id="panel-add">
 
       <div class="form-row">
-        <div class="form-group" style="flex:0 0 90px">
-          <label for="inp-day">Day #</label>
-          <input type="number" id="inp-day" min="1" value="1" />
+        <div class="form-group" style="flex:0 0 auto">
+          <label>Day</label>
+          <div style="display:flex;align-items:center;gap:4px">
+            <input type="number" id="inp-day" min="1" value="1" style="width:52px"
+                   onchange="calcTimeFields('start')" />
+            <span style="color:rgba(247,255,246,.4);font-size:.75rem;font-weight:700">–</span>
+            <input type="number" id="inp-end-day" min="1" value="1" style="width:52px"
+                   title="End day (same as start = single day)"
+                   onchange="calcTimeFields('endday')" />
+          </div>
         </div>
         <div class="form-group">
           <label for="inp-type">Stop Type</label>
           <select id="inp-type"></select>
         </div>
+      </div>
+
+      <div class="form-group">
+        <label>Priority</label>
+        <div class="priority-selector">
+          <button type="button" class="prio-btn prio-btn--1 prio-active" onclick="selectPriority(1)">01 · Must Have</button>
+          <button type="button" class="prio-btn prio-btn--2" onclick="selectPriority(2)">02 · Nice to Have</button>
+          <button type="button" class="prio-btn prio-btn--3" onclick="selectPriority(3)">03 · Could Have</button>
+        </div>
+        <input type="hidden" id="inp-priority" value="1" />
       </div>
 
       <div class="form-row">
@@ -1369,12 +1494,20 @@
         <select id="inp-booking-ref" onchange="onBookingRefChange()">
           <option value="">— None —</option>
         </select>
-        <div class="field-hint">Pick a booking to use its saved location — Maps URL becomes optional.</div>
+        <div class="field-hint">Link a booking to this stop. If the booking has a saved location, the Maps URL becomes optional.</div>
       </div>
 
-      <div class="form-group">
-        <label for="inp-maps">Google Maps Link <span id="maps-url-required">*</span></label>
-        <input type="url" id="inp-maps" placeholder="Paste a Google Maps URL…" autocomplete="off" />
+      <div class="form-group" style="position:relative">
+        <label>Location <span id="maps-url-required">*</span></label>
+        <div class="loc-search-row">
+          <input type="text" id="inp-loc-search" placeholder="Search for a place…"
+                 autocomplete="off" spellcheck="false"
+                 oninput="onLocSearchInput()" onkeydown="onLocSearchKey(event)" />
+          <button type="button" class="btn-loc-search" onclick="doLocSearch()" title="Search">Search</button>
+        </div>
+        <div id="loc-search-results" class="loc-search-results" style="display:none"></div>
+        <div class="loc-or-divider">or paste a link / coordinates</div>
+        <input type="url" id="inp-maps" placeholder="Paste a Google Maps URL or lat,lng…" autocomplete="off" />
         <div class="field-hint">
           In Google Maps: tap <em>Share → Copy link</em>, or copy the URL from your browser's address bar.
           Also accepts <em>lat, lng</em> coordinates directly.
@@ -1621,9 +1754,10 @@ let description       = '';                         // active trip markdown desc
 let savedAt           = 0;                          // timestamp of last save (for sync conflict resolution)
 let githubSettings    = { pat:'', owner:'', repo:'', path:'trips.json', autoSync:false };
 let lastSyncTime      = null;                       // Date of last successful GitHub sync
-let visibleTypes    = new Set(Object.keys(TYPES));  // types currently shown on map
-let activeDayFilter = new Set();                    // selected days; empty = all shown
-let filterBarOpen = false;                          // filter chip panel open/closed
+let visibleTypes          = new Set(Object.keys(TYPES));  // types currently shown on map
+let activeDayFilter       = new Set();                    // selected days; empty = all shown
+let activePriorityFilter  = new Set([1, 2, 3]);           // shown priorities; all 3 = no filter
+let filterBarOpen = false;                                // filter chip panel open/closed
 let timelineView      = false;                       // itinerary timeline vs card list
 let tlFetchInProgress = false;                       // guard: prevent concurrent fetchTimelineDriving()
 let drivingMode   = false;                          // driving route mode (OSRM)
@@ -1922,27 +2056,28 @@ function renderBookingRefSelect() {
   if (!sel) return;
   const cur = sel.value;
 
-  // Rebuild options — only bookings that have a geocoded location
+  // Rebuild options — all bookings; mark those without a saved location
   sel.innerHTML = '<option value="">— None —</option>';
-  const withLoc = spanItems.filter(si => si.lat);
-  [...withLoc].sort((a, b) => (a.startDay || 0) - (b.startDay || 0)).forEach(si => {
+  [...spanItems].sort((a, b) => (a.startDay || 0) - (b.startDay || 0)).forEach(si => {
     const opt = document.createElement('option');
     opt.value = si.id;
-    const dayStr   = si.startDay === si.endDay ? `Day ${si.startDay}` : `Days ${si.startDay}–${si.endDay}`;
-    const dateStr  = formatDayDate(si.startDay);
-    opt.textContent = `${si.name} (${dayStr}${dateStr ? ' · ' + dateStr : ''})`;
+    const dayStr  = si.startDay === si.endDay ? `Day ${si.startDay}` : `Days ${si.startDay}–${si.endDay}`;
+    const dateStr = formatDayDate(si.startDay);
+    const locNote = si.lat ? '' : ' · no location';
+    opt.textContent = `${si.name} (${dayStr}${dateStr ? ' · ' + dateStr : ''}${locNote})`;
     sel.appendChild(opt);
   });
 
   // Restore prior selection if it still exists in the list
   if (cur && [...sel.options].some(o => o.value === cur)) sel.value = cur;
 
-  // Show row only when there are bookings with a location
-  document.getElementById('booking-ref-row').style.display = withLoc.length ? '' : 'none';
+  // Show row whenever there are any bookings
+  document.getElementById('booking-ref-row').style.display = spanItems.length ? '' : 'none';
 
-  // Toggle the * required marker on the Maps URL label
+  // Toggle the * required marker — hide only when the selected booking already has coordinates
   const req = document.getElementById('maps-url-required');
-  if (req) req.style.display = sel.value ? 'none' : '';
+  const selectedSi = sel.value ? spanItems.find(s => s.id === parseInt(sel.value)) : null;
+  if (req) req.style.display = selectedSi?.lat ? 'none' : '';
 }
 
 function onBookingRefChange() {
@@ -1950,9 +2085,9 @@ function onBookingRefChange() {
   const id  = parseInt(sel.value) || null;
   const si  = id ? spanItems.find(s => s.id === id) : null;
 
-  // Toggle * required marker
+  // Toggle * required marker — only hide when the selected booking has saved coordinates
   const req = document.getElementById('maps-url-required');
-  if (req) req.style.display = id ? 'none' : '';
+  if (req) req.style.display = si?.lat ? 'none' : '';
 
   if (!si) return;
 
@@ -1967,6 +2102,8 @@ function onBookingRefChange() {
 // ─── Add stop ────────────────────────────────────────────────────────
 async function addStop() {
   const day        = Math.max(1, parseInt(document.getElementById('inp-day').value) || 1);
+  const endDayRaw  = Math.max(1, parseInt(document.getElementById('inp-end-day').value) || 1);
+  const endDay     = Math.max(day, endDayRaw);
   const type       = document.getElementById('inp-type').value;
   const name       = document.getElementById('inp-name').value.trim();
   const mapsUrl    = document.getElementById('inp-maps').value.trim();
@@ -1974,6 +2111,7 @@ async function addStop() {
   const photoUrl   = document.getElementById('inp-photo').value.trim();
   const startTime  = document.getElementById('inp-start').value;
   const endTime    = document.getElementById('inp-end').value;
+  const priority   = parseInt(document.getElementById('inp-priority').value) || 1;
   const btn        = document.getElementById('btn-add');
 
   // Booking link — if set the stop inherits the booking's coordinates
@@ -2021,14 +2159,14 @@ async function addStop() {
       // Update existing stop in-place
       const idx = stops.findIndex(s => s.id === editingId);
       if (idx !== -1) {
-        stops[idx] = { ...stops[idx], day, type, name, mapsUrl,
+        stops[idx] = { ...stops[idx], day, endDay: endDay > day ? endDay : undefined, type, priority, name, mapsUrl,
                        lat: coords.lat, lng: coords.lng, notes, photoUrl, startTime, endTime, bookingRef };
       }
       editingId = null;
       document.getElementById('btn-add').textContent            = '+ Add Stop';
       document.getElementById('btn-cancel-edit').style.display  = 'none';
     } else {
-      stops.push({ id: Date.now(), day, type, name, mapsUrl,
+      stops.push({ id: Date.now(), day, endDay: endDay > day ? endDay : undefined, type, priority, name, mapsUrl,
                    lat: coords.lat, lng: coords.lng, notes, photoUrl, startTime, endTime, bookingRef });
     }
     save();
@@ -2041,7 +2179,9 @@ async function addStop() {
     document.getElementById('inp-start').value        = '';
     document.getElementById('inp-dur').value          = '';
     document.getElementById('inp-end').value          = '';
+    document.getElementById('inp-end-day').value      = document.getElementById('inp-day').value;
     document.getElementById('inp-booking-ref').value  = '';
+    selectPriority(1);
     renderBookingRefSelect();
     clearStatus();
 
@@ -2074,16 +2214,23 @@ function editStop(id) {
   if (!s) return;
 
   // Pre-fill all form fields with current values
-  document.getElementById('inp-day').value   = s.day      || 1;
-  document.getElementById('inp-type').value  = s.type     || 'other';
+  document.getElementById('inp-day').value     = s.day      || 1;
+  document.getElementById('inp-end-day').value = s.endDay   || s.day || 1;
+  document.getElementById('inp-type').value    = s.type     || 'other';
   document.getElementById('inp-maps').value  = s.mapsUrl  || '';
   document.getElementById('inp-name').value  = s.name     || '';
+  // Pre-fill search field with the location name so the user can refine it
+  document.getElementById('inp-loc-search').value = s.name || '';
+  hideLocResults();
   document.getElementById('inp-notes').value = s.notes     || '';
   document.getElementById('inp-photo').value = s.photoUrl  || '';
   document.getElementById('inp-start').value = s.startTime || '';
   document.getElementById('inp-dur').value   =
-    (s.startTime && s.endTime) ? durToStr(toMins(s.endTime) - toMins(s.startTime)) : '';
+    (s.startTime && s.endTime)
+      ? durToStr(((s.endDay || s.day || 1) - (s.day || 1)) * 1440 + toMins(s.endTime) - toMins(s.startTime))
+      : '';
   document.getElementById('inp-end').value   = s.endTime   || '';
+  selectPriority(s.priority || 1);
 
   // Booking reference
   const bkSel = document.getElementById('inp-booking-ref');
@@ -2114,8 +2261,10 @@ function cancelEdit() {
   document.getElementById('inp-photo').value = '';
   document.getElementById('inp-start').value = '';
   document.getElementById('inp-dur').value   = '';
-  document.getElementById('inp-end').value   = '';
+  document.getElementById('inp-end').value      = '';
+  document.getElementById('inp-end-day').value  = 1;
   document.getElementById('inp-booking-ref').value = '';
+  selectPriority(1);
   renderBookingRefSelect();
   clearStatus();
   showTab('list');
@@ -2281,30 +2430,149 @@ function durToStr(m) {
 //   Start + Duration  → End
 //   End   + Duration  → Start
 //   Start + End       → Duration  (times take priority over duration)
+// ─── Location search (Nominatim / OpenStreetMap) ──────────────────────
+let _locTimer   = null;
+let _locResults = [];
+let _locFocus   = -1;
+
+function onLocSearchInput() {
+  clearTimeout(_locTimer);
+  const q = document.getElementById('inp-loc-search').value.trim();
+  if (q.length < 2) { hideLocResults(); return; }
+  _locTimer = setTimeout(doLocSearch, 420);
+}
+
+function onLocSearchKey(e) {
+  const items = [...document.querySelectorAll('#loc-search-results .loc-result-item')];
+  if (!items.length) { if (e.key === 'Enter') doLocSearch(); return; }
+  if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    _locFocus = Math.min(_locFocus + 1, items.length - 1);
+    items.forEach((el, i) => el.classList.toggle('focused', i === _locFocus));
+    items[_locFocus]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'ArrowUp') {
+    e.preventDefault();
+    _locFocus = Math.max(_locFocus - 1, 0);
+    items.forEach((el, i) => el.classList.toggle('focused', i === _locFocus));
+    items[_locFocus]?.scrollIntoView({ block: 'nearest' });
+  } else if (e.key === 'Enter') {
+    e.preventDefault();
+    if (_locFocus >= 0) selectLocResult(_locFocus); else doLocSearch();
+  } else if (e.key === 'Escape') {
+    hideLocResults();
+  }
+}
+
+async function doLocSearch() {
+  const q = document.getElementById('inp-loc-search').value.trim();
+  if (!q) return;
+  const box = document.getElementById('loc-search-results');
+  box.style.display = 'block';
+  box.innerHTML = '<div class="loc-result-item" style="opacity:.5;cursor:default">Searching…</div>';
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=6&addressdetails=1`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    _locResults = data;
+    _locFocus   = -1;
+    if (!data.length) {
+      box.innerHTML = '<div class="loc-result-item" style="opacity:.5;cursor:default">No results found.</div>';
+      return;
+    }
+    box.innerHTML = data.map((r, i) => {
+      const name = r.name || r.display_name.split(',')[0].trim();
+      return `<div class="loc-result-item" onclick="selectLocResult(${i})">
+        <span class="loc-result-name">${esc(name)}</span>
+        <span class="loc-result-address">${esc(r.display_name)}</span>
+      </div>`;
+    }).join('');
+  } catch {
+    box.innerHTML = '<div class="loc-result-item" style="opacity:.5;cursor:default">Search unavailable — paste a link instead.</div>';
+  }
+}
+
+function selectLocResult(i) {
+  const r = _locResults[i];
+  if (!r) return;
+  const name = r.name || r.display_name.split(',')[0].trim();
+  // Fill coords into the maps field
+  document.getElementById('inp-maps').value = `${parseFloat(r.lat).toFixed(6)},${parseFloat(r.lon).toFixed(6)}`;
+  // Pre-fill location name if blank
+  const nameEl = document.getElementById('inp-name');
+  if (!nameEl.value.trim()) nameEl.value = name;
+  // Show chosen place in the search field
+  document.getElementById('inp-loc-search').value = r.display_name;
+  hideLocResults();
+}
+
+function hideLocResults() {
+  const box = document.getElementById('loc-search-results');
+  if (box) box.style.display = 'none';
+  _locFocus = -1;
+}
+
+// Close dropdown when clicking outside the search area
+document.addEventListener('mousedown', e => {
+  if (!e.target.closest('#loc-search-results, .loc-search-row')) hideLocResults();
+});
+
+// ─── Time calculation helpers ──────────────────────────────────────────
 function calcTimeFields(changed) {
   const start = document.getElementById('inp-start').value;
   const end   = document.getElementById('inp-end').value;
   const dur   = parseDur(document.getElementById('inp-dur').value);
 
+  const startDay    = Math.max(1, parseInt(document.getElementById('inp-day').value)     || 1);
+  const endDayInput = document.getElementById('inp-end-day');
+  const endDay      = Math.max(startDay, parseInt(endDayInput?.value) || startDay);
+
+  // Helper: set end time + auto-adjust end-day when total mins overflows midnight
+  const setEndFromStartPlusDur = (startTimeStr, durationMins) => {
+    const total        = toMins(startTimeStr) + durationMins;
+    const dayOverflow  = Math.floor(total / 1440);
+    const endTimeMins  = total % 1440;
+    document.getElementById('inp-end').value = minsToTime(endTimeMins);
+    if (endDayInput) endDayInput.value = startDay + dayOverflow;
+  };
+
+  // Helper: set start time + auto-adjust start-day when subtraction underflows midnight
+  const setStartFromEndMinusDur = (endTimeStr, durationMins) => {
+    const endAbsMins   = (endDay - 1) * 1440 + toMins(endTimeStr);
+    const startAbsMins = endAbsMins - durationMins;
+    if (startAbsMins < 0) return; // can't go before trip start
+    const newStartDay  = Math.floor(startAbsMins / 1440) + 1;
+    document.getElementById('inp-start').value = minsToTime(startAbsMins % 1440);
+    document.getElementById('inp-day').value   = newStartDay;
+    if (endDayInput && parseInt(endDayInput.value) < newStartDay)
+      endDayInput.value = newStartDay;
+  };
+
+  // Helper: derive duration accounting for multi-day span
+  const calcDurFromStartEnd = (startTimeStr, endTimeStr) => {
+    const d = (endDay - startDay) * 1440 + toMins(endTimeStr) - toMins(startTimeStr);
+    document.getElementById('inp-dur').value = d >= 0 ? durToStr(d) : '';
+  };
+
   if (changed === 'start') {
     if (start && end) {
-      const d = toMins(end) - toMins(start);
-      document.getElementById('inp-dur').value = d >= 0 ? durToStr(d) : '';
+      calcDurFromStartEnd(start, end);
     } else if (start && dur !== null) {
-      document.getElementById('inp-end').value = minsToTime(toMins(start) + dur);
+      setEndFromStartPlusDur(start, dur);
     }
   } else if (changed === 'end') {
     if (start && end) {
-      const d = toMins(end) - toMins(start);
-      document.getElementById('inp-dur').value = d >= 0 ? durToStr(d) : '';
+      calcDurFromStartEnd(start, end);
     } else if (end && dur !== null) {
-      document.getElementById('inp-start').value = minsToTime(toMins(end) - dur);
+      setStartFromEndMinusDur(end, dur);
     }
+  } else if (changed === 'endday') {
+    // End-day changed: recalculate duration if both times are set
+    if (start && end) calcDurFromStartEnd(start, end);
   } else { // 'dur'
     if (dur !== null && start) {
-      document.getElementById('inp-end').value = minsToTime(toMins(start) + dur);
+      setEndFromStartPlusDur(start, dur);
     } else if (dur !== null && end) {
-      document.getElementById('inp-start').value = minsToTime(toMins(end) - dur);
+      setStartFromEndMinusDur(end, dur);
     }
   }
 }
@@ -2502,6 +2770,57 @@ function makeSpanChipRow(day) {
   return row;
 }
 
+// ─── Timeline lane assignment for parallel stops ─────────────────────
+// items: [{startM, endM, ...}]  — mutates each item to add .lane and .totalLanes
+function assignTimelineLanes(items) {
+  if (!items.length) return;
+
+  // Sort a copy by startM to assign lanes greedily
+  const sorted = [...items].sort((a, b) => a.startM - b.startM);
+  const laneEndM = []; // tracks the latest endM for each lane
+
+  sorted.forEach(item => {
+    // Find first lane whose last block has already finished
+    let picked = -1;
+    for (let i = 0; i < laneEndM.length; i++) {
+      if (laneEndM[i] <= item.startM) { picked = i; break; }
+    }
+    if (picked === -1) { picked = laneEndM.length; laneEndM.push(0); }
+    laneEndM[picked] = item.endM;
+    item.lane = picked;
+  });
+
+  // Group overlapping items into connected components via union-find
+  // so each component knows its own totalLanes (max concurrent overlap)
+  sorted.forEach(item => { item._ufParent = item; });
+  function ufFind(x) { return x._ufParent === x ? x : (x._ufParent = ufFind(x._ufParent)); }
+  function ufUnion(a, b) { const ra = ufFind(a), rb = ufFind(b); if (ra !== rb) rb._ufParent = ra; }
+
+  for (let i = 0; i < sorted.length; i++) {
+    for (let j = i + 1; j < sorted.length; j++) {
+      if (sorted[j].startM < sorted[i].endM) ufUnion(sorted[i], sorted[j]);
+      else break; // sorted by startM, no further item can overlap sorted[i]
+    }
+  }
+
+  // Max lane per component
+  const groupMax = new Map();
+  sorted.forEach(item => {
+    const root = ufFind(item);
+    groupMax.set(root, Math.max(groupMax.get(root) ?? 0, item.lane));
+  });
+
+  // Compute totalLanes for ALL items in one pass BEFORE any deletion
+  // (path-compression in ufFind would break if we interleave deletes)
+  const tlMap = new Map(sorted.map(item => [item, groupMax.get(ufFind(item)) + 1]));
+
+  // Apply and clean up
+  sorted.forEach(item => {
+    item.totalLanes = tlMap.get(item);
+    delete item._ufParent;
+  });
+}
+
 // ─── Timeline render ─────────────────────────────────────────────────
 function renderTimeline() {
   const container = document.getElementById('stop-list-container');
@@ -2510,9 +2829,24 @@ function renderTimeline() {
   const fmtH   = m => String(Math.floor(m / 60)).padStart(2, '0') + ':00';
   const fmtGap = m => m >= 1440 ? '24:00' : minsToTime(m);
 
+  // Role of stop s on day d: null=single-day, 'start'=first day, 'mid'=middle, 'end'=last day
+  const getRole = (s, d) => {
+    if (!s.endDay || s.endDay <= (s.day || 0)) return null;
+    if (d === (s.day || 0)) return 'start';
+    if (d === s.endDay)     return 'end';
+    return 'mid';
+  };
+
   const route = routeOrder();
   const byDay = {};
-  route.forEach(s => { const k = s.day || 0; (byDay[k] = byDay[k] || []).push(s); });
+  // Each stop appears on every day it covers so each day section shows the continuation
+  route.forEach(s => {
+    if (!visibleTypes.has(s.type || 'other')) return; // skip stops excluded by type filter
+    if (!prioFilterMatch(s)) return;                  // skip stops excluded by priority filter
+    const start = s.day || 0;
+    const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
+    for (let d = start; d <= end; d++) (byDay[d] = byDay[d] || []).push(s);
+  });
   // Include days covered only by span items
   spanItems.forEach(si => {
     const s = si.startDay || 1, e = si.endDay || s;
@@ -2523,13 +2857,19 @@ function renderTimeline() {
     .filter(d => activeDayFilter.size === 0 || activeDayFilter.has(d))
     .forEach(day => {
     const dayStops = byDay[day];
-    const timed    = dayStops.filter(s => s.startTime);
-    const untimed  = dayStops.filter(s => !s.startTime);
+
+    // Mid-day continuations go into a band row, not the compressed grid
+    const midConts  = dayStops.filter(s => getRole(s, day) === 'mid');
+    const gridStops = dayStops.filter(s => getRole(s, day) !== 'mid');
+
+    // End-day stops always enter the timed grid (using 00:00 as effective start)
+    const timed   = gridStops.filter(s => getRole(s, day) === 'end' ? true  : !!s.startTime);
+    const untimed = gridStops.filter(s => getRole(s, day) === 'end' ? false : !s.startTime);
 
     const section = document.createElement('div');
     section.className = 'day-section';
 
-    // Day header (reuse existing style)
+    // Day header
     const cnt = dayStops.length;
     const tlDayDateStr = day > 0 ? formatDayDate(day) : null;
     section.innerHTML = `
@@ -2546,8 +2886,54 @@ function renderTimeline() {
     const chipRow = makeSpanChipRow(day);
     if (chipRow) section.appendChild(chipRow);
 
+    // ── Mid-day continuation bands ──────────────────────────────────
+    midConts.forEach(s => {
+      const t    = TYPES[s.type] || TYPES.other;
+      const band = document.createElement('div');
+      band.className = 'tl-cont-band';
+      band.style.cssText = `border-left-color:${t.color}; background:${t.color}15;`;
+      band.innerHTML = `
+        <span class="tl-cont-band-icon">${iconHtml(s.type, { size: 13, fill: t.color })}</span>
+        <div class="tl-cont-band-info">
+          <span class="tl-cont-band-name">${esc(s.name)}</span>
+          <span class="tl-cont-band-meta">full day &middot; <span class="stop-day-range-badge">D${s.day}–${s.endDay}</span></span>
+        </div>
+        <button class="tl-block-edit" title="Edit stop"
+          onclick="editStop(${s.id})">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none"
+            stroke="rgba(247,255,246,.8)" stroke-width="2.2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+            <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+          </svg>
+        </button>`;
+      section.appendChild(band);
+    });
+
     if (timed.length) {
-      const { segs, totalH, timeToY, yToTime } = buildTimelineSegs(timed);
+      // Effective objects for segment/axis calculation (start-day extends to 23:59;
+      // end-day uses 00:00 start and actual endTime or 1-hour default)
+      const timedForSegs = timed.map(s => {
+        const r = getRole(s, day);
+        if (r === 'start') return { startTime: s.startTime, endTime: '23:59' };
+        if (r === 'end')   return { startTime: '00:00', endTime: s.endTime || '01:00' };
+        return s;
+      });
+      const { segs, totalH, timeToY, yToTime } = buildTimelineSegs(timedForSegs);
+
+      // Pre-compute startM/endM for each timed stop, then assign parallel lanes
+      const timedItems = timed.map(s => {
+        const role   = getRole(s, day);
+        const effSt  = (role === 'end') ? '00:00' : s.startTime;
+        const startM = toMins(effSt);
+        const endM   = (role === 'start')                 ? 1440
+                     : (role === 'end' && s.endTime)      ? toMins(s.endTime)
+                     : (role === 'end')                   ? startM + 60
+                     : s.endTime                          ? toMins(s.endTime)
+                     :                                      startM + 30;
+        return { s, startM, endM };
+      });
+      assignTimelineLanes(timedItems);
 
       const grid  = document.createElement('div');
       grid.className = 'tl-grid';
@@ -2595,13 +2981,17 @@ function renderTimeline() {
       }
 
       // Stop blocks
-      timed.forEach(s => {
-        const t       = TYPES[s.type] || TYPES.other;
-        const startM  = toMins(s.startTime);
-        const endM    = s.endTime ? toMins(s.endTime) : startM + 30;
-        const topPx   = timeToY(startM);
-        const hPx     = Math.max(36, timeToY(endM) - timeToY(startM));
-        const timeStr = s.startTime + (s.endTime ? ` – ${s.endTime}` : '');
+      timedItems.forEach(({ s, startM, endM, lane, totalLanes }) => {
+        const t    = TYPES[s.type] || TYPES.other;
+        const role = getRole(s, day);
+
+        const topPx = timeToY(startM);
+        const hPx   = Math.max(36, timeToY(endM) - timeToY(startM));
+
+        // Time label string varies by role
+        const timeStr = role === 'end'
+          ? (s.endTime ? `ends ${s.endTime}` : 'ends today')
+          : s.startTime + (s.endTime && role !== 'start' ? ` – ${s.endTime}` : '');
 
         // Booking reference badge
         const tlLinkedSi = s.bookingRef ? spanItems.find(si => si.id === s.bookingRef) : null;
@@ -2617,14 +3007,28 @@ function renderTimeline() {
           : '';
 
         const block = document.createElement('div');
-        block.className = 'tl-block';
+        const isNarrow = totalLanes > 1;
+        block.className = 'tl-block'
+          + (role === 'start' ? ' tl-block--multiday-start' : '')
+          + (role === 'end'   ? ' tl-block--multiday-end'   : '')
+          + (isNarrow         ? ' tl-block--narrow'         : '');
         block.style.cssText = `top:${topPx}px; height:${hPx}px;`
           + `background:${t.color}20; border-left-color:${t.color};`;
+        // For parallel blocks, override left/right to place each in its lane column
+        if (isNarrow) {
+          const pct = 100 / totalLanes;
+          block.style.left  = `calc(${lane * pct}% + 2px)`;
+          block.style.right = `calc(${(totalLanes - lane - 1) * pct}% + 2px)`;
+        }
         block.title = s.name;
+        const rangeBadge = (role === 'start' || role === 'end')
+          ? `<span class="stop-day-range-badge" style="margin-left:4px">D${s.day}–${s.endDay}</span>` : '';
         block.innerHTML = `
+          ${role === 'end' ? `<div class="tl-block-started">↑ started Day ${s.day}</div>` : ''}
           <div class="tl-block-name">${esc(s.name)}</div>
-          <div class="tl-block-time">${iconHtml(s.type, { size: 10, fill: t.color })} ${timeStr}</div>
+          <div class="tl-block-time">${iconHtml(s.type, { size: 10, fill: t.color })} ${timeStr}${rangeBadge}${s.priority ? ` <span class="prio-badge prio-badge--${s.priority}" style="font-size:.56rem;padding:1px 4px;vertical-align:middle">0${s.priority}</span>` : ''}</div>
           ${tlBkBadge ? `<div class="tl-block-booking">${tlBkBadge}</div>` : ''}
+          ${role === 'start' ? `<div class="tl-block-continues">continues through Day ${s.endDay} ↓</div>` : ''}
           <button class="tl-block-edit" title="Edit stop"
             onmousedown="event.stopPropagation()"
             onclick="event.stopPropagation(); editStop(${s.id})">
@@ -2699,13 +3103,20 @@ function renderTimeline() {
             })()
           : '';
 
+        const miniRole      = getRole(s, day);
+        const isMultiDayCard = miniRole !== null;
         const card = document.createElement('div');
-        card.className = 'tl-mini-card';
+        card.className = 'tl-mini-card'
+          + (miniRole === 'start' ? ' tl-mini-card--multiday' : '')
+          + (miniRole === 'end'   ? ' tl-mini-card--multiday-end' : '');
         card.style.cssText = `border-left-color:${t.color};`;
         card.onclick = () => focusStop(s.id);
+        const rangeMeta = isMultiDayCard
+          ? ` <span class="stop-day-range-badge" style="margin-left:4px">D${s.day}–${s.endDay}</span>` : '';
+        const endLabel = miniRole === 'end' ? ` · ends today` : '';
         card.innerHTML = `
           <div class="tl-mini-card-name">${esc(s.name)}</div>
-          <div class="tl-mini-card-meta">${iconHtml(s.type, { size: 11, fill: t.color })} ${t.label}</div>
+          <div class="tl-mini-card-meta">${iconHtml(s.type, { size: 11, fill: t.color })} ${t.label}${endLabel}${rangeMeta}</div>
           ${miniBkBadge ? `<div style="margin-top:3px">${miniBkBadge}</div>` : ''}
           <button class="tl-block-edit" title="Edit stop"
             onmousedown="event.stopPropagation()"
@@ -2740,6 +3151,7 @@ function renderList() {
     stops.length ? `Itinerary (${stops.length})` : 'Itinerary';
 
   renderDayFilter();
+  renderPriorityFilter();
 
   if (!stops.length && !spanItems.length) {
     container.innerHTML = `
@@ -2763,8 +3175,11 @@ function renderList() {
   // Group by day (include days covered only by span items)
   const byDay = {};
   stops.forEach(s => {
-    const k = s.day || 0;
-    (byDay[k] = byDay[k] || []).push(s);
+    if (!visibleTypes.has(s.type || 'other')) return; // skip stops excluded by type filter
+    if (!prioFilterMatch(s)) return;                  // skip stops excluded by priority filter
+    const start = s.day || 0;
+    const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
+    for (let d = start; d <= end; d++) (byDay[d] = byDay[d] || []).push(s);
   });
   spanItems.forEach(si => {
     const s = si.startDay || 1, e = si.endDay || s;
@@ -2844,9 +3259,11 @@ function renderList() {
           })()
         : '';
 
+      const isStartDay = (s.day || 0) === day;
       const card = document.createElement('div');
-      card.className = 'stop-item';
+      card.className = 'stop-item' + (isStartDay ? '' : ' stop-item--continuation');
       card.dataset.id = s.id;
+      if (!isStartDay) card.dataset.noDrag = '1';
       card.innerHTML = `
         <div class="stop-top">
           <div class="stop-badge" style="background:${t.color}20">${iconHtml(s.type, { size: 18 })}</div>
@@ -2854,6 +3271,13 @@ function renderList() {
             <div class="stop-name" title="${esc(s.name)}">${esc(s.name)}</div>
             <div class="stop-meta">
               <span class="type-pill" style="background:${t.color}20;color:${t.color}">${t.label}</span>
+              ${(s.endDay && s.endDay > (s.day || 0))
+                ? `<span class="stop-day-range-badge">D${s.day}–${s.endDay}</span>`
+                : ''}
+              ${s.priority ? (() => {
+                  const lbl = ['','Must Have','Nice to Have','Could Have'][s.priority];
+                  return `<span class="prio-badge prio-badge--${s.priority}">0${s.priority} ${lbl}</span>`;
+                })() : ''}
               ${s.startTime ? `<span class="time-badge">
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor"
                      stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
@@ -2942,6 +3366,7 @@ function renderList() {
     Sortable.create(groupEl, {
       group:        'roadtrip',
       draggable:    '.stop-item',   // only stop cards are draggable (not leg connectors)
+      filter:       '[data-no-drag]', // continuation cards are not draggable
       animation:    150,
       ghostClass:   'sortable-ghost',
       chosenClass:  'sortable-chosen',
@@ -2992,10 +3417,18 @@ async function updateMap() {
   if (!stops.length) { statsEl.style.display = 'none'; return; }
 
   const route        = routeOrderWithSpans();
+  // Check if a stop is visible given the active day filter — multi-day stops
+  // are visible on any day within their range, not just their start day.
+  const dayFilterMatch = s => {
+    if (activeDayFilter.size === 0) return true;
+    const start = s.day || 0;
+    const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
+    return [...activeDayFilter].some(d => d >= start && d <= end);
+  };
+
   const visibleRoute = route.filter(s => {
-    if (s._isVirtual) return activeDayFilter.size === 0 || activeDayFilter.has(s.day || 0);
-    return visibleTypes.has(s.type || 'other') &&
-           (activeDayFilter.size === 0 || activeDayFilter.has(s.day || 0));
+    if (s._isVirtual) return dayFilterMatch(s);
+    return visibleTypes.has(s.type || 'other') && dayFilterMatch(s) && prioFilterMatch(s);
   });
   const coords       = [];
 
@@ -3257,6 +3690,7 @@ function toggleTypeFilter(key) {
   }
   renderFilterBar();
   updateMap();
+  renderList();
 }
 
 function setAllTypesVisible(all) {
@@ -3267,14 +3701,17 @@ function setAllTypesVisible(all) {
   }
   renderFilterBar();
   updateMap();
+  renderList();
 }
 
 function toggleFilterBar() {
   filterBarOpen = !filterBarOpen;
   document.getElementById('filter-bar').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('filter-chips').classList.toggle('collapsed', !filterBarOpen);
+  document.getElementById('priority-filter-section').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('day-filter-section').classList.toggle('collapsed', !filterBarOpen);
   document.getElementById('btn-filter-chevron').classList.toggle('open', filterBarOpen);
+  if (filterBarOpen) renderPriorityFilter();
 }
 
 function renderDayFilter() {
@@ -3327,6 +3764,61 @@ function toggleDayFilter(d) {
 function clearDayFilter() {
   activeDayFilter.clear();
   renderDayFilter();
+  updateMap();
+  renderList();
+}
+
+// ─── Priority filter ──────────────────────────────────────────────────
+// Returns true if the stop passes the current priority filter
+function prioFilterMatch(s) {
+  if (activePriorityFilter.size === 3) return true; // all shown — skip check
+  return activePriorityFilter.has(s.priority || 1); // undefined priority defaults to 1
+}
+
+function renderPriorityFilter() {
+  const el = document.getElementById('priority-filter-section');
+  if (!el) return;
+
+  const PRIOS = [
+    { n: 1, label: '01 · Must Have',    color: '#FF4757' },
+    { n: 2, label: '02 · Nice to Have', color: '#FF9F43' },
+    { n: 3, label: '03 · Could Have',   color: '#8A9099' },
+  ];
+
+  const allOn = activePriorityFilter.size === 3;
+  el.innerHTML = `<div class="day-filter-hdr">
+    <span class="filter-bar-label" style="font-size:.63rem">
+      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+      </svg>
+      Priority
+    </span>
+    <button class="btn-filter-ctrl" onclick="clearPriorityFilter()"
+      style="${allOn ? 'border-color:rgba(247,255,246,.4);color:#F7FFF6' : ''}">All</button>
+  </div>` +
+  PRIOS.map(({ n, label, color }) => {
+    const on = activePriorityFilter.has(n);
+    return `<button class="filter-chip${on ? '' : ' off'}"
+      style="${on ? `background:${color}22;border-color:${color};color:${color}` : ''}"
+      onclick="togglePriorityFilter(${n})"
+      title="${on ? 'Hide' : 'Show only'} ${label}">
+      ${label}
+    </button>`;
+  }).join('');
+}
+
+function togglePriorityFilter(n) {
+  if (activePriorityFilter.has(n)) activePriorityFilter.delete(n);
+  else activePriorityFilter.add(n);
+  renderPriorityFilter();
+  updateMap();
+  renderList();
+}
+
+function clearPriorityFilter() {
+  activePriorityFilter = new Set([1, 2, 3]);
+  renderPriorityFilter();
   updateMap();
   renderList();
 }
@@ -3708,8 +4200,13 @@ function renderDaysNav() {
   const el = document.getElementById('days-nav');
   if (!el) return;
 
-  // Collect all day numbers from stops and spanItems
-  const daySet = new Set(stops.map(s => s.day || 0));
+  // Collect all day numbers — multi-day stops contribute every day they cover
+  const daySet = new Set();
+  stops.forEach(s => {
+    const start = s.day || 0;
+    const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
+    for (let d = start; d <= end; d++) daySet.add(d);
+  });
   spanItems.forEach(si => {
     for (let d = (si.startDay || 1); d <= (si.endDay || si.startDay || 1); d++) daySet.add(d);
   });
@@ -3726,7 +4223,7 @@ function renderDaysNav() {
     <div class="nav-day-header-row" onclick="selectNavDay(0)">
       <svg class="nav-day-chevron${allActive ? ' open' : ''}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
       <span class="nav-day-label">All days</span>
-      <span class="nav-day-count">${stops.length}</span>
+      <span class="nav-day-count">${stops.filter(s => visibleTypes.has(s.type || 'other') && prioFilterMatch(s)).length}</span>
     </div>
   </div>`;
 
@@ -3734,7 +4231,16 @@ function renderDaysNav() {
   const allDays = hasUnassigned ? [0, ...days] : days;
   allDays.forEach(d => {
     if (d === 0 && !hasUnassigned) return;
-    const dayStops    = stops.filter(s => (s.day || 0) === d);
+    // Stops active on this day (filtered by type + priority; includes multi-day continuations)
+    const dayStopsAll = stops.filter(s => {
+      if (!visibleTypes.has(s.type || 'other')) return false;
+      if (!prioFilterMatch(s)) return false;
+      const start = s.day || 0;
+      const end   = (s.endDay && s.endDay >= start) ? s.endDay : start;
+      return d >= start && d <= end;
+    });
+    // Stops to display as individual items — same filter
+    const dayStops = dayStopsAll;
     const isActive    = activeDayFilter.has(d);
     const showItems   = isActive;
     const dateStr     = d > 0 ? formatDayDate(d) : null;
@@ -3746,17 +4252,27 @@ function renderDaysNav() {
         <svg class="nav-day-chevron${isActive ? ' open' : ''}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
         <span class="nav-day-label">${label}</span>
         ${dateStr ? `<span class="nav-day-date">${dateStr}</span>` : ''}
-        <span class="nav-day-count">${dayStops.length + inlineBks.length}</span>
+        <span class="nav-day-count">${dayStopsAll.length + inlineBks.length}</span>
       </div>`;
 
     if (showItems) {
       // Individual stops
       dayStops.forEach(s => {
-        const t = TYPES[s.type] || TYPES.other;
-        html += `<div class="nav-stop-item" onclick="focusStop(${s.id})" title="${esc(s.name)}">
+        const t    = TYPES[s.type] || TYPES.other;
+        const isStart = (s.day || 0) === d;
+        const isEnd   = s.endDay === d && !isStart;
+        const isMid   = !isStart && !isEnd && s.endDay && s.endDay > d;
+        const isCont  = !isStart; // any non-start continuation
+        const rangeBadge = (s.endDay && s.endDay > (s.day || 0))
+          ? `<span class="nav-stop-days" style="color:${t.color}">D${s.day}–${s.endDay}</span>` : '';
+        const timeLabel = isStart && s.startTime ? `<span class="nav-stop-time">${s.startTime}</span>`
+                        : isEnd   && s.endTime   ? `<span class="nav-stop-time">→${s.endTime}</span>`
+                        : isMid                  ? `<span class="nav-stop-time" style="opacity:.5">↕</span>`
+                        : '';
+        html += `<div class="nav-stop-item${isCont ? ' nav-stop-item--cont' : ''}" onclick="focusStop(${s.id})" title="${esc(s.name)}">
           <span class="nav-stop-icon" style="color:${t.color}">${iconHtml(s.type, {size: 12})}</span>
           <span class="nav-stop-name">${esc(s.name)}</span>
-          ${s.startTime ? `<span class="nav-stop-time">${s.startTime}</span>` : ''}
+          ${rangeBadge || timeLabel}
         </div>`;
       });
       // Bookings starting on this day
@@ -3845,9 +4361,39 @@ function selectNavDay(dayNum) {
   fitMapToTrip();
 }
 
+function selectPriority(n) {
+  document.getElementById('inp-priority').value = n;
+  document.querySelectorAll('.prio-btn').forEach((btn, i) => {
+    btn.classList.toggle('prio-active', i + 1 === n);
+  });
+}
+
+function clearStopForm() {
+  editingId = null;
+  document.getElementById('btn-add').textContent           = '+ Add Stop';
+  document.getElementById('btn-cancel-edit').style.display = 'none';
+  document.getElementById('inp-name').value    = '';
+  document.getElementById('inp-maps').value    = '';
+  document.getElementById('inp-loc-search').value = '';
+  hideLocResults();
+  document.getElementById('inp-notes').value   = '';
+  document.getElementById('inp-photo').value   = '';
+  document.getElementById('inp-start').value   = '';
+  document.getElementById('inp-dur').value     = '';
+  document.getElementById('inp-end').value     = '';
+  document.getElementById('inp-end-day').value = 1;
+  document.getElementById('inp-booking-ref').value = '';
+  selectPriority(1);
+  renderBookingRefSelect();
+  clearStatus();
+}
+
 function openAddForDay(day) {
   clearStopForm();
-  if (day > 0) document.getElementById('inp-day').value = day;
+  if (day > 0) {
+    document.getElementById('inp-day').value     = day;
+    document.getElementById('inp-end-day').value = day;
+  }
   showTab('add');
 }
 
